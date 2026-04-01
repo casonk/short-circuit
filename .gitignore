@@ -1,0 +1,31 @@
+# Local session memory
+CHATHISTORY.md
+
+# Secrets and local environment files
+.env
+.env.*
+secrets/
+runtime/
+state/
+config/wireguard/*.local.conf
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Local automation scratch space
+artifacts/
+reports/
+scan-cache/
+
+# Validation leftovers
+*.log
+
+# Transient diagram export sidecars
+*.cmapx
