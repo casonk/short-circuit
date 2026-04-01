@@ -37,6 +37,7 @@ WIREGUARD_PROFILE="wireguard-public-vpn"
 LAN_SUBNET=""
 SERVER_CONFIG_EXPLICIT=0
 CLIENT_CONFIG_EXPLICIT=0
+SKIP_CLEANUP_PROMPT=0
 
 usage() {
   cat <<'EOF'
@@ -66,6 +67,8 @@ Options:
   --skip-start             Do not enable or restart wg-quick@wg0 after installing config.
   --print-client-qr        Print an ANSI QR code for the client peer config.
   --qr-output PATH         Write a PNG QR code for the client peer config.
+  --skip-cleanup-prompt    Do not prompt to remove stale WireGuard config files left
+                           by a previous installer (e.g. snowbridge-wireguard.conf).
   --help                   Show this help text.
 
 This installer will install missing runtime packages automatically when a
@@ -625,6 +628,70 @@ render_client_qr() {
   fi
 }
 
+prompt_yes_no() {
+  local question="$1"
+  local answer
+
+  if [[ ! -t 0 ]]; then
+    warn "non-interactive stdin; skipping prompt: ${question}"
+    return 1
+  fi
+
+  while true; do
+    printf '%s [y/N] ' "${question}" >&2
+    read -r answer </dev/tty
+    case "${answer}" in
+      [yY]|[yY][eE][sS]) return 0 ;;
+      [nN]|[nN][oO]|"")  return 1 ;;
+      *) printf 'Please answer y or n.\n' >&2 ;;
+    esac
+  done
+}
+
+cleanup_stale_wireguard_configs() {
+  (( SKIP_CLEANUP_PROMPT == 1 )) && return
+
+  local stale_files=()
+  local dnsmasq_dir
+  local dropin_dir
+
+  dnsmasq_dir="$(dirname "${WIREGUARD_DNS_DEST}")"
+  dropin_dir="$(dirname "${WIREGUARD_DNS_DROPIN}")"
+
+  while IFS= read -r -d '' candidate; do
+    [[ "${candidate}" == "${WIREGUARD_DNS_DEST}" ]] && continue
+    stale_files+=("${candidate}")
+  done < <(find "${dnsmasq_dir}" -maxdepth 1 -name "*wireguard*.conf" -print0 2>/dev/null)
+
+  while IFS= read -r -d '' candidate; do
+    [[ "${candidate}" == "${WIREGUARD_DNS_DROPIN}" ]] && continue
+    stale_files+=("${candidate}")
+  done < <(find "${dropin_dir}" -maxdepth 1 -name "*wireguard*.conf" -print0 2>/dev/null)
+
+  if (( ${#stale_files[@]} == 0 )); then
+    return
+  fi
+
+  log ""
+  log "Stale WireGuard config files found from a previous installer:"
+  for f in "${stale_files[@]}"; do
+    log "  ${f}"
+  done
+  log ""
+
+  if prompt_yes_no "Remove these stale files now?"; then
+    for f in "${stale_files[@]}"; do
+      rm -f "${f}"
+      log "removed ${f}"
+    done
+    systemctl daemon-reload
+    log "daemon-reload after stale file removal"
+  else
+    log "keeping stale files; remove them manually if dnsmasq behaves unexpectedly"
+  fi
+  log ""
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --init-local-configs)
@@ -693,6 +760,10 @@ while [[ $# -gt 0 ]]; do
       QR_OUTPUT="$2"
       shift 2
       ;;
+    --skip-cleanup-prompt)
+      SKIP_CLEANUP_PROMPT=1
+      shift
+      ;;
     --help)
       usage
       exit 0
@@ -719,6 +790,7 @@ if (( INIT_LOCAL_CONFIGS == 1 )); then
 fi
 
 require_root
+cleanup_stale_wireguard_configs
 require_command install
 require_command systemctl
 install_runtime_packages_if_needed
