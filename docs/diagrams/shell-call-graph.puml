@@ -1,0 +1,58 @@
+@startuml
+title short-circuit Shell Script Flow
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Monospace
+skinparam componentStyle rectangle
+skinparam linetype ortho
+rectangle "scripts/setup_wireguard.sh\n0 local shell edges\n22 external tools" as shell_scripts_setup_wireguard_sh #DBEAFE
+cloud "Endpoint" as tool_endpoint #FEF3C7
+cloud "[nN]" as tool_nn #FEF3C7
+cloud "[nN][oO]" as tool_nn_oo #FEF3C7
+cloud "[yY]" as tool_yy #FEF3C7
+cloud "apt-get" as tool_apt_get #FEF3C7
+cloud "cat" as tool_cat #FEF3C7
+cloud "client-private-key" as tool_client_private_key #FEF3C7
+cloud "dnf" as tool_dnf #FEF3C7
+cloud "firewall-cmd" as tool_firewall_cmd #FEF3C7
+cloud "grep" as tool_grep #FEF3C7
+cloud "icanhazip.com" as tool_icanhazip_com #FEF3C7
+cloud "install" as tool_install #FEF3C7
+cloud "print" as tool_print #FEF3C7
+cloud "qrencode" as tool_qrencode #FEF3C7
+cloud "rm" as tool_rm #FEF3C7
+cloud "server-public-key" as tool_server_public_key #FEF3C7
+cloud "sysctl" as tool_sysctl #FEF3C7
+cloud "systemctl" as tool_systemctl #FEF3C7
+cloud "value" as tool_value #FEF3C7
+cloud "wg" as tool_wg #FEF3C7
+cloud "wireguard-public-vpn" as tool_wireguard_public_vpn #FEF3C7
+cloud "yum" as tool_yum #FEF3C7
+shell_scripts_setup_wireguard_sh --> tool_endpoint
+shell_scripts_setup_wireguard_sh --> tool_nn
+shell_scripts_setup_wireguard_sh --> tool_nn_oo
+shell_scripts_setup_wireguard_sh --> tool_yy
+shell_scripts_setup_wireguard_sh --> tool_apt_get
+shell_scripts_setup_wireguard_sh --> tool_cat
+shell_scripts_setup_wireguard_sh --> tool_client_private_key
+shell_scripts_setup_wireguard_sh --> tool_dnf
+shell_scripts_setup_wireguard_sh --> tool_firewall_cmd
+shell_scripts_setup_wireguard_sh --> tool_grep
+shell_scripts_setup_wireguard_sh --> tool_icanhazip_com
+shell_scripts_setup_wireguard_sh --> tool_install
+shell_scripts_setup_wireguard_sh --> tool_print
+shell_scripts_setup_wireguard_sh --> tool_qrencode
+shell_scripts_setup_wireguard_sh --> tool_rm
+shell_scripts_setup_wireguard_sh --> tool_server_public_key
+shell_scripts_setup_wireguard_sh --> tool_sysctl
+shell_scripts_setup_wireguard_sh --> tool_systemctl
+shell_scripts_setup_wireguard_sh --> tool_value
+shell_scripts_setup_wireguard_sh --> tool_wg
+shell_scripts_setup_wireguard_sh --> tool_wireguard_public_vpn
+shell_scripts_setup_wireguard_sh --> tool_yum
+note as shellGraphSummary
+Scanned 1 shell script.
+Detected 0 local shell edges.
+Detected 22 external tools.
+end note
+@enduml
