@@ -95,7 +95,7 @@ WireGuard tunnel. Covers both public-vpn and lan-vpn routing scopes.
 
 ## Future Integration
 
-`./util-repos/pit-stop` will extend the SSH access patterns available through
+`./util-repos/pit-box` will extend the SSH access patterns available through
 the WireGuard tunnel established by this repo, providing SSH key management,
 bastion patterns, and host certificate workflows.
 
