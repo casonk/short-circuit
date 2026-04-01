@@ -1,0 +1,77 @@
+@startuml repo-architecture
+!pragma layout smetana
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam ArrowColor #555555
+skinparam ComponentBorderColor #555555
+skinparam ComponentBackgroundColor #F5F5F5
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title short-circuit — WireGuard VPN Setup and Configuration
+
+package "Profile Selection" {
+  [wireguard-public-vpn\n(host-only)] as PublicVPN
+  [wireguard-lan-vpn\n(host + LAN)] as LanVPN
+}
+
+package "Config Templates\n(config/wireguard/)" {
+  [wg0-server.example.conf] as ServerExample
+  [wg0-server.lan-vpn.example.conf] as ServerLanExample
+  [client-peer.example.conf] as ClientExample
+  [client-peer.lan-vpn.example.conf] as ClientLanExample
+}
+
+package "Local Configs (gitignored)" {
+  [wg0-server.<profile>.local.conf] as ServerLocal
+  [client-peer.<profile>.local.conf] as ClientLocal
+}
+
+package "scripts/setup_wireguard.sh" {
+  [--init-local-configs] as InitStep
+  [Key Generation\n(wg genkey)] as KeyGen
+  [Placeholder Validation] as Validation
+  [Installer (root)] as Installer
+}
+
+package "Host System" {
+  [/etc/wireguard/wg0.conf] as WgConf
+  [dnsmasq split-DNS\n/etc/dnsmasq.d/] as DnsMasq
+  [firewalld zone\n(trusted)] as Firewall
+  [wg-quick@wg0] as WgService
+}
+
+package "Tunnel Access" {
+  [SMB\nsmb://10.99.0.1] as SMB
+  [HTTPS\nhttps://<private-hostname>] as HTTPS
+  [SSH\nssh user@10.99.0.1] as SSH
+}
+
+PublicVPN --> InitStep
+LanVPN --> InitStep
+ServerExample --> InitStep
+ClientExample --> InitStep
+InitStep --> ServerLocal
+InitStep --> ClientLocal
+ServerLocal --> KeyGen
+ClientLocal --> KeyGen
+KeyGen --> Validation
+ServerLocal --> Validation
+ClientLocal --> Validation
+Validation --> Installer
+Installer --> WgConf
+Installer --> DnsMasq
+Installer --> Firewall
+Installer --> WgService
+WgService --> SMB
+WgService --> HTTPS
+WgService --> SSH
+DnsMasq ..> HTTPS : resolves\nprivate hostname
+
+note bottom of SSH
+  pit-stop will extend SSH
+  access patterns in depth
+end note
+
+@enduml
