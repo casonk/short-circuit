@@ -129,6 +129,6 @@ Destination: 10.99.0.0/24   Gateway: <host LAN IP>
 
 ## Future: SSH In Depth
 
-`./util-repos/pit-stop` will provide deeper SSH-specific functionality layered
+`./util-repos/pit-box` will provide deeper SSH-specific functionality layered
 on top of the WireGuard tunnel established by this repo, including SSH key
 management, bastion patterns, and host certificate workflows.

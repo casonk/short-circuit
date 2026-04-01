@@ -110,7 +110,7 @@ See `docs/access-modes.md` for detailed patterns per service type.
 
 - `./util-repos/snowbridge` uses this repo to establish the WireGuard tunnel
   used for remote SMB and HTTPS file-share access.
-- `./util-repos/pit-stop` will extend the SSH access patterns available through
+- `./util-repos/pit-box` will extend the SSH access patterns available through
   the tunnel.
 
 ## Requirements

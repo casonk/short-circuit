@@ -67,7 +67,7 @@ The two supported access profiles are:
 
 ## Future Integration
 
-`pit-stop` will later provide deeper SSH-specific functionality that complements
+`pit-box` will later provide deeper SSH-specific functionality that complements
 the WireGuard tunnel established by this repo.
 
 Last reviewed: `2026-04-01`
