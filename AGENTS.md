@@ -27,6 +27,7 @@ The two supported access profiles are:
 - `./util-repos/nordility`: standard VPN-switching utility repo
 - `./util-repos/shock-relay`: standard external-messaging utility repo
 - `./util-repos/snowbridge`: standard SMB-based file-sharing and phone-access
+- `./util-repos/dyno-lab`: standard unified test bench utility repo
   utility repo
 
 ## Session Continuity
