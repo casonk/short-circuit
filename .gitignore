@@ -1,5 +1,6 @@
 # Local session memory
 CHATHISTORY.md
+.codex
 
 # Secrets and local environment files
 .env
