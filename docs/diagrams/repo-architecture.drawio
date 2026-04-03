@@ -9,7 +9,7 @@
           <mxGeometry x="40" y="40" width="320" height="225" as="geometry" />
         </mxCell>
         <mxCell id="11" value="wireguard-public-vpn&#10;(host-only)" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="10">
-          <mxGeometry x="20" y="90" width="130" height="60" as="geometry" />
+          <mxGeometry x="20" y="100" width="130" height="60" as="geometry" />
         </mxCell>
         <mxCell id="12" value="wireguard-lan-vpn&#10;(host + full LAN)" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="10">
           <mxGeometry x="170" y="90" width="130" height="60" as="geometry" />
@@ -77,8 +77,8 @@
         <mxCell id="70" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="11" target="41" parent="1">
           <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
             <Array as="points">
-              <mxPoint x="85" y="174" />
-              <mxPoint x="72" y="174" />
+              <mxPoint x="85" y="184" />
+              <mxPoint x="72" y="184" />
               <mxPoint x="72" y="256" />
               <mxPoint x="60" y="256" />
             </Array>
