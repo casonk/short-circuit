@@ -30,3 +30,5 @@ scan-cache/
 
 # Transient diagram export sidecars
 *.cmapx
+
+CLAUDE.md
