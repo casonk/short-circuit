@@ -32,3 +32,5 @@ scan-cache/
 *.cmapx
 
 CLAUDE.md
+
+.tachometer/
