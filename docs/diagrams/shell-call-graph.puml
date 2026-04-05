@@ -5,6 +5,7 @@ skinparam shadowing false
 skinparam defaultFontName Monospace
 skinparam componentStyle rectangle
 skinparam linetype ortho
+rectangle "scripts/run_tachometer_profile.sh\n0 local shell edges\n3 external tools" as shell_scripts_run_tachometer_profile_sh #DBEAFE
 rectangle "scripts/setup_wireguard.sh\n0 local shell edges\n22 external tools" as shell_scripts_setup_wireguard_sh #DBEAFE
 cloud "Endpoint" as tool_endpoint #FEF3C7
 cloud "[nN]" as tool_nn #FEF3C7
@@ -21,13 +22,19 @@ cloud "install" as tool_install #FEF3C7
 cloud "print" as tool_print #FEF3C7
 cloud "qrencode" as tool_qrencode #FEF3C7
 cloud "rm" as tool_rm #FEF3C7
+cloud "run" as tool_run #FEF3C7
 cloud "server-public-key" as tool_server_public_key #FEF3C7
+cloud "summarize" as tool_summarize #FEF3C7
 cloud "sysctl" as tool_sysctl #FEF3C7
 cloud "systemctl" as tool_systemctl #FEF3C7
+cloud "tachometer" as tool_tachometer #FEF3C7
 cloud "value" as tool_value #FEF3C7
 cloud "wg" as tool_wg #FEF3C7
 cloud "wireguard-public-vpn" as tool_wireguard_public_vpn #FEF3C7
 cloud "yum" as tool_yum #FEF3C7
+shell_scripts_run_tachometer_profile_sh --> tool_run
+shell_scripts_run_tachometer_profile_sh --> tool_summarize
+shell_scripts_run_tachometer_profile_sh --> tool_tachometer
 shell_scripts_setup_wireguard_sh --> tool_endpoint
 shell_scripts_setup_wireguard_sh --> tool_nn
 shell_scripts_setup_wireguard_sh --> tool_nn_oo
@@ -51,8 +58,8 @@ shell_scripts_setup_wireguard_sh --> tool_wg
 shell_scripts_setup_wireguard_sh --> tool_wireguard_public_vpn
 shell_scripts_setup_wireguard_sh --> tool_yum
 note as shellGraphSummary
-Scanned 1 shell script.
+Scanned 2 shell scripts.
 Detected 0 local shell edges.
-Detected 22 external tools.
+Detected 25 external tools.
 end note
 @enduml

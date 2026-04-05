@@ -6,6 +6,7 @@ skinparam defaultFontName Monospace
 skinparam componentStyle rectangle
 skinparam linetype ortho
 rectangle ".github/workflows/ci.yml\n4 detected tools" as source_github_workflows_ci_yml #E0F2FE
+rectangle "scripts/run_tachometer_profile.sh\n3 detected tools" as source_scripts_run_tachometer_profile_sh #E0F2FE
 rectangle "scripts/setup_wireguard.sh\n22 detected tools" as source_scripts_setup_wireguard_sh #E0F2FE
 cloud "Endpoint" as tool_endpoint #FEF3C7
 cloud "[nN]" as tool_nn #FEF3C7
@@ -26,9 +27,12 @@ cloud "pre-commit" as tool_pre_commit #FEF3C7
 cloud "print" as tool_print #FEF3C7
 cloud "qrencode" as tool_qrencode #FEF3C7
 cloud "rm" as tool_rm #FEF3C7
+cloud "run" as tool_run #FEF3C7
 cloud "server-public-key" as tool_server_public_key #FEF3C7
+cloud "summarize" as tool_summarize #FEF3C7
 cloud "sysctl" as tool_sysctl #FEF3C7
 cloud "systemctl" as tool_systemctl #FEF3C7
+cloud "tachometer" as tool_tachometer #FEF3C7
 cloud "value" as tool_value #FEF3C7
 cloud "wg" as tool_wg #FEF3C7
 cloud "wireguard-public-vpn" as tool_wireguard_public_vpn #FEF3C7
@@ -37,6 +41,9 @@ source_github_workflows_ci_yml --> tool_actions_checkout
 source_github_workflows_ci_yml --> tool_actions_setup_python
 source_github_workflows_ci_yml --> tool_pip
 source_github_workflows_ci_yml --> tool_pre_commit
+source_scripts_run_tachometer_profile_sh --> tool_run
+source_scripts_run_tachometer_profile_sh --> tool_summarize
+source_scripts_run_tachometer_profile_sh --> tool_tachometer
 source_scripts_setup_wireguard_sh --> tool_endpoint
 source_scripts_setup_wireguard_sh --> tool_nn
 source_scripts_setup_wireguard_sh --> tool_nn_oo
@@ -60,7 +67,7 @@ source_scripts_setup_wireguard_sh --> tool_wg
 source_scripts_setup_wireguard_sh --> tool_wireguard_public_vpn
 source_scripts_setup_wireguard_sh --> tool_yum
 note as toolingGraphSummary
-Scanned 2 tooling entrypoints.
-Detected 26 third-party tools.
+Scanned 3 tooling entrypoints.
+Detected 29 third-party tools.
 end note
 @enduml
