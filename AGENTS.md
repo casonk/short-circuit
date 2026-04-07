@@ -72,3 +72,14 @@ The two supported access profiles are:
 the WireGuard tunnel established by this repo.
 
 Last reviewed: `2026-04-01`
+
+## Local CI Verification
+
+Run before every push:
+
+```bash
+pre-commit run --all-files
+```
+
+Do not push changes that have not passed all checks locally.
+
