@@ -15,6 +15,7 @@ This repo lives under:
 - Enable authenticated SMB, HTTPS, and SSH access from mobile or remote clients
   through a private WireGuard tunnel.
 - Keep all real keys, endpoints, and host-specific values outside git.
+- Consent reference: [`../../doc-repos/my-consent/remote-access-and-private-files.md`](../../doc-repos/my-consent/remote-access-and-private-files.md) documents the explicit consent covering personal remote-access, device, and access-control data handled by this repo.
 
 ## Supported Profiles
 
