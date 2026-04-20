@@ -10,3 +10,7 @@ summary_path = ".tachometer/summary.json"
 
 [defaults]
 label = "repo-snapshot"
+[notify]
+shock_relay_root = "/mnt/4tb-m2/git/util-repos/shock-relay"
+service = "signal"
+target = "+18103607272"
