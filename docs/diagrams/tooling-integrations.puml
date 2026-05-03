@@ -6,6 +6,7 @@ skinparam defaultFontName Monospace
 skinparam componentStyle rectangle
 skinparam linetype ortho
 rectangle ".github/workflows/ci.yml\n4 detected tools" as source_github_workflows_ci_yml #E0F2FE
+rectangle ".github/workflows/secret-scan.yml\n2 detected tools" as source_github_workflows_secret_scan_yml #E0F2FE
 rectangle "scripts/run_tachometer_profile.sh\n3 detected tools" as source_scripts_run_tachometer_profile_sh #E0F2FE
 rectangle "scripts/setup_wireguard.sh\n22 detected tools" as source_scripts_setup_wireguard_sh #E0F2FE
 cloud "Endpoint" as tool_endpoint #FEF3C7
@@ -19,6 +20,7 @@ cloud "cat" as tool_cat #FEF3C7
 cloud "client-private-key" as tool_client_private_key #FEF3C7
 cloud "dnf" as tool_dnf #FEF3C7
 cloud "firewall-cmd" as tool_firewall_cmd #FEF3C7
+cloud "gitleaks/gitleaks-action" as tool_gitleaks_gitleaks_action #FEF3C7
 cloud "grep" as tool_grep #FEF3C7
 cloud "icanhazip.com" as tool_icanhazip_com #FEF3C7
 cloud "install" as tool_install #FEF3C7
@@ -41,6 +43,8 @@ source_github_workflows_ci_yml --> tool_actions_checkout
 source_github_workflows_ci_yml --> tool_actions_setup_python
 source_github_workflows_ci_yml --> tool_pip
 source_github_workflows_ci_yml --> tool_pre_commit
+source_github_workflows_secret_scan_yml --> tool_actions_checkout
+source_github_workflows_secret_scan_yml --> tool_gitleaks_gitleaks_action
 source_scripts_run_tachometer_profile_sh --> tool_run
 source_scripts_run_tachometer_profile_sh --> tool_summarize
 source_scripts_run_tachometer_profile_sh --> tool_tachometer
@@ -67,7 +71,7 @@ source_scripts_setup_wireguard_sh --> tool_wg
 source_scripts_setup_wireguard_sh --> tool_wireguard_public_vpn
 source_scripts_setup_wireguard_sh --> tool_yum
 note as toolingGraphSummary
-Scanned 3 tooling entrypoints.
-Detected 29 third-party tools.
+Scanned 4 tooling entrypoints.
+Detected 30 third-party tools.
 end note
 @enduml
