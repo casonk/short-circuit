@@ -73,6 +73,12 @@ the WireGuard tunnel established by this repo.
 
 Last reviewed: `2026-04-01`
 
+## Sudo Boundary
+
+Agents will never be able to run `sudo` commands in this environment. If a task requires elevated system changes, make the repo edits and run the validation that can be done without `sudo`, then give the user the exact command(s) to run.
+
+Always require the user to run those commands instead of retrying `sudo`; do not claim a sudo-backed live change was applied until the user shares the result.
+
 ## Local CI Verification
 
 Run before every push:
