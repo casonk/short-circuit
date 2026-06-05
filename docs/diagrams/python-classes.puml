@@ -1,0 +1,8 @@
+@startuml classes_short-circuit
+set namespaceSeparator none
+note as archilityPythonSurfaceNote
+Minimal class surface detected.
+Scanned 1 Python module.
+See python-import-deps-conftest.svg for module-level imports.
+end note
+@enduml

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "short-circuit"
+version = "0.1.0"
+description = "WireGuard VPN setup and configuration utility for private remote access."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Cason Konzer", email = "casonk@umich.edu" },
+]
+license = { text = "MIT" }
+keywords = ["wireguard", "vpn", "networking", "tunnel", "remote-access"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: System :: Networking",
+  "Topic :: Utilities",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Homepage = "https://github.com/casonk/short-circuit"
+Repository = "https://github.com/casonk/short-circuit"
+Changelog = "https://github.com/casonk/short-circuit/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "black",
+    "dyno_lab @ git+https://github.com/casonk/dyno-lab.git",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008", "SIM108", "SIM117"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
