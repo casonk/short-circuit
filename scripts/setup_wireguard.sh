@@ -478,11 +478,17 @@ install_wireguard_dns() {
 # managed by short-circuit setup_wireguard.sh
 interface=${INTERFACE_NAME}
 listen-address=${dns_ip}
-bind-interfaces
+bind-dynamic
 no-hosts
 host-record=${dns_hostname},${dns_ip}
 EOF
   log "installed ${WIREGUARD_DNS_DEST}"
+
+  if command -v dnsmasq &>/dev/null; then
+    if ! dnsmasq --test 2>/dev/null; then
+      warn "dnsmasq --test failed after writing ${WIREGUARD_DNS_DEST} — check /etc/dnsmasq.d/ for conflicting bind-interfaces/bind-dynamic options"
+    fi
+  fi
 
   dropin_dir="$(dirname "${WIREGUARD_DNS_DROPIN}")"
   install -d "${dropin_dir}"
