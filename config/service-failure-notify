@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Notify via shock-relay email when a systemd service fails.
+# Called by service-failure-notify@.service with the failed unit name as $1.
+set -euo pipefail
+
+UNIT="${1:-unknown}"
+SHOCK_RELAY_DIR="${SHOCK_RELAY_DIR:-/mnt/4tb-m2/git/util-repos/shock-relay}"
+SEND_EMAIL="${SHOCK_RELAY_DIR}/services/gmail-imap/send_email.py"
+EMAIL_CONFIG="${SHOCK_RELAY_DIR}/services/gmail-imap/config.local.yaml"
+
+NOTIFY_ENV="/etc/service-failure-notify.env"
+[[ -f "${NOTIFY_ENV}" ]] && source "${NOTIFY_ENV}"
+
+NOTIFY_EMAIL="${NOTIFY_EMAIL:-}"
+
+if [[ -z "${NOTIFY_EMAIL}" ]]; then
+  echo "[service-failure-notify] NOTIFY_EMAIL not set in ${NOTIFY_ENV} — skipping email" >&2
+  exit 0
+fi
+
+JOURNAL="$(journalctl -u "${UNIT}" -n 30 --no-pager --output=short 2>/dev/null || true)"
+HOSTNAME="$(hostname -s 2>/dev/null || echo desk)"
+
+SUBJECT="[${HOSTNAME}] systemd unit failed: ${UNIT}"
+BODY="Unit ${UNIT} entered a failed state on ${HOSTNAME}.
+
+Last 30 journal lines:
+${JOURNAL}
+
+Diagnose with:
+  journalctl -u ${UNIT} -n 50 --no-pager"
+
+if [[ ! -f "${SEND_EMAIL}" ]]; then
+  echo "[service-failure-notify] send_email.py not found at ${SEND_EMAIL}" >&2
+  exit 1
+fi
+
+python3 "${SEND_EMAIL}" \
+  --config "${EMAIL_CONFIG}" \
+  "${NOTIFY_EMAIL}" \
+  "${SUBJECT}" \
+  "${BODY}"
