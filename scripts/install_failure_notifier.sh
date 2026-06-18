@@ -20,10 +20,11 @@ fi
 # Prompt for notification email if env file doesn't exist
 if [[ ! -f "${NOTIFY_ENV}" ]]; then
   read -rp "Notification email address (e.g. casonkonzer@gmail.com): " NOTIFY_EMAIL
-  cat > "${NOTIFY_ENV}" <<EOF
+  SHOCK_RELAY_DIR="${SHOCK_RELAY_DIR:-/mnt/4tb-m2/git/util-repos/shock-relay}"
+cat > "${NOTIFY_ENV}" <<EOF
 # Written by short-circuit/scripts/install_failure_notifier.sh
 NOTIFY_EMAIL=${NOTIFY_EMAIL}
-SHOCK_RELAY_DIR=/mnt/4tb-m2/git/util-repos/shock-relay
+SHOCK_RELAY_DIR=${SHOCK_RELAY_DIR}
 EOF
   chmod 644 "${NOTIFY_ENV}"
   echo "Wrote ${NOTIFY_ENV}"
