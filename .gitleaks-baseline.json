@@ -2,6 +2,30 @@
  {
   "RuleID": "portfolio-git-workspace-path",
   "Description": "Hardcoded absolute path to local git workspace in config/code/scripts",
+  "StartLine": 23,
+  "EndLine": 23,
+  "StartColumn": 39,
+  "EndColumn": 54,
+  "Match": "/mnt/4tb-m2/git/",
+  "Secret": "/mnt/4tb-m2/git/",
+  "File": "scripts/install_failure_notifier.sh",
+  "SymlinkFile": "",
+  "Commit": "19f45a3bef23d7834d3f698813a7a375cd3e4e96",
+  "Link": "https://github.com/casonk/short-circuit/blob/19f45a3bef23d7834d3f698813a7a375cd3e4e96/scripts/install_failure_notifier.sh#L23",
+  "Entropy": 3.0778196,
+  "Author": "Cason Konzer",
+  "Email": "72440835+casonk@users.noreply.github.com",
+  "Date": "2026-06-18T11:52:38Z",
+  "Message": "fix: correct heredoc indentation in install_failure_notifier.sh\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
+  "Tags": [
+   "local-path",
+   "machine-specific"
+  ],
+  "Fingerprint": "19f45a3bef23d7834d3f698813a7a375cd3e4e96:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:23"
+ },
+ {
+  "RuleID": "portfolio-git-workspace-path",
+  "Description": "Hardcoded absolute path to local git workspace in config/code/scripts",
   "StartLine": 7,
   "EndLine": 7,
   "StartColumn": 38,
@@ -16,7 +40,7 @@
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
   "Date": "2026-06-14T01:28:08Z",
-  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
+  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
   "Tags": [
    "local-path",
    "machine-specific"
@@ -40,7 +64,7 @@
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
   "Date": "2026-06-14T01:28:08Z",
-  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
+  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
   "Tags": [
    "local-path",
    "machine-specific"
