@@ -78,8 +78,30 @@ The installer will:
 - Install `wireguard-tools` and `dnsmasq` if missing.
 - Write the server config to `/etc/wireguard/wg0.conf`.
 - Configure a split-DNS helper so clients resolve private hostnames.
+- Open the WireGuard UDP listen port on the WAN-facing firewalld zone.
 - Assign the WireGuard interface to the `trusted` firewalld zone.
 - Enable and start `wg-quick@wg0`.
+
+### Export a Desktop Client Config
+
+For a MacBook or other desktop client, export the validated client config to a
+share or handoff path and import it into the WireGuard app:
+
+```bash
+./scripts/setup_wireguard.sh \
+  --profile wireguard-public-vpn \
+  --export-client-config /srv/snowbridge/share/tmp/macbook-air-wireguard.conf
+```
+
+If the device also needs private HTTPS client-certificate access, pair that
+with `wiring-harness`:
+
+```bash
+sudo python3 ../wiring-harness/scripts/export_mtls_profile.py \
+  --device-name macbook-air \
+  --type mobile \
+  --platform macos
+```
 
 ### LAN-VPN Profile
 

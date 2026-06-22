@@ -78,11 +78,13 @@ The installer will:
 2. Write the server config to `/etc/wireguard/wg0.conf`.
 3. Configure a split-DNS helper under `/etc/dnsmasq.d/` so connected clients
    resolve the private hostname to the server tunnel IP.
-4. Configure a `systemd` drop-in so `dnsmasq` waits for the WireGuard interface.
-5. Assign the WireGuard interface to the `trusted` firewalld zone (if `firewalld`
+4. Open the WireGuard UDP listen port on the WAN-facing firewalld zone
+   (default: `public`).
+5. Configure a `systemd` drop-in so `dnsmasq` waits for the WireGuard interface.
+6. Assign the WireGuard interface to the `trusted` firewalld zone (if `firewalld`
    is active).
-6. Enable and start `wg-quick@wg0`.
-7. Print an ANSI QR code for the client peer config.
+7. Enable and start `wg-quick@wg0`.
+8. Print an ANSI QR code for the client peer config.
 
 ### Key Installer Flags
 
@@ -94,6 +96,7 @@ The installer will:
 | `--skip-dns` | Do not install the dnsmasq split-DNS helper |
 | `--skip-firewall` | Do not update firewalld |
 | `--skip-start` | Install config without enabling or starting WireGuard |
+| `--public-zone ZONE` | firewalld zone that should allow inbound UDP for the WireGuard listen port |
 | `--print-client-qr` | Print ANSI QR for client peer config |
 | `--qr-output PATH` | Write PNG QR for client peer config |
 
@@ -117,13 +120,35 @@ The `--lan-subnet` flag updates the client `AllowedIPs` to include both the
 WireGuard tunnel subnet and the home LAN range. The `--enable-ip-forward` flag
 writes a `sysctl` drop-in enabling IPv4 and IPv6 forwarding on the host.
 
-## 4. Import Client Config
+## 4. Export and Import the Client Config
+
+For desktop clients such as a MacBook Air, export a validated WireGuard config
+to a handoff path:
+
+```bash
+./scripts/setup_wireguard.sh \
+  --profile wireguard-public-vpn \
+  --export-client-config /srv/snowbridge/share/tmp/macbook-air-wireguard.conf
+```
 
 After the installer prints the QR code, import it on the client device:
 
 - **iOS/Android**: open the WireGuard app and tap the `+` to scan the QR code.
 - **macOS/Windows**: use the WireGuard desktop app to import the `.conf` file.
 - Or transfer `config/wireguard/client-peer.public-vpn.local.conf` securely.
+
+If the same MacBook also needs private HTTPS or admin-site access protected by
+the shared mTLS CA, export the Apple trust profile from `wiring-harness`:
+
+```bash
+sudo python3 ../wiring-harness/scripts/export_mtls_profile.py \
+  --device-name macbook-air \
+  --type mobile \
+  --platform macos
+```
+
+That stages a signed Apple `mobileconfig` and PKCS#12 identity for macOS
+import alongside the WireGuard tunnel config.
 
 ## 5. Verify the Connection
 
