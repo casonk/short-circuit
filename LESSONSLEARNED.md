@@ -35,6 +35,23 @@
   automatically but should still warn that a stable endpoint is the better
   final state.
 
+### 2026-06-21 — Placeholder validation should ignore documentation comments
+
+- WireGuard sample configs can legitimately mention `<placeholder>` tokens in
+  explanatory comment lines even after every runtime field has been filled in.
+- Validation should scan active config statements, not comment prose, or the
+  repo will reject valid client exports and installer runs with misleading
+  "still contains placeholder values" errors.
+
+### 2026-06-21 — A WireGuard installer must open the WAN-side UDP listen port
+
+- Assigning `wg0` to a permissive internal firewalld zone is not sufficient for
+  remote clients; the server's WAN-facing zone must also allow inbound UDP on
+  the configured `ListenPort`.
+- If the installer manages firewalld at all, it should manage both pieces:
+  public ingress on the listen port and the interface-to-zone mapping for
+  post-handshake traffic.
+
 ### 2026-04-01 — VPN profile names should describe routing scope, not just transport
 
 - A single generic WireGuard example blurs together two materially different

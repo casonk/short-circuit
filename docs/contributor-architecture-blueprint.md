@@ -26,12 +26,13 @@ Local Configs (gitignored *.local.conf)
   wg0-server.<profile>.local.conf
   client-peer.<profile>.local.conf
                           │
-     ┌──────────────────┬─┘
-     ▼                  ▼
-Key Generation    Placeholder Validation
-(wg genkey)       (fail on remaining <...>)
-     │                  │
-     └──────────────────┘
+     ┌──────────────────┬─────────────────────┐
+     ▼                  ▼                     ▼
+Key Generation    Placeholder Validation   Client Export
+(wg genkey)       (fail on remaining       (.conf handoff,
+                   <...>)                   optional QR)
+     │                  │                     │
+     └──────────────────┴─────────────────────┘
                           │
                           ▼ sudo
 Installer (scripts/setup_wireguard.sh)
@@ -39,6 +40,7 @@ Installer (scripts/setup_wireguard.sh)
   sysctl ip_forward drop-in (--enable-ip-forward)
   dnsmasq split-DNS helper (/etc/dnsmasq.d/)
   systemd dnsmasq drop-in (After=wg-quick@wg0)
+  firewalld WAN-port allow (udp/ListenPort on public by default)
   firewalld zone assignment (trusted by default)
   wg-quick@wg0 enable + start
                           │
@@ -59,9 +61,9 @@ LAN Forwarding
 ### scripts/setup_wireguard.sh
 
 The generalized WireGuard installer. Orchestrates config initialization, key
-generation, endpoint auto-fill, OS package installation, config deploy,
-split-DNS setup, firewall assignment, and service lifecycle. Supports both
-profiles through a `--profile` flag.
+generation, endpoint auto-fill, client-config export, OS package installation,
+config deploy, split-DNS setup, firewall assignment, and service lifecycle.
+Supports both profiles through a `--profile` flag.
 
 ### config/wireguard/
 
@@ -72,7 +74,8 @@ are the runtime inputs for the installer.
 ### docs/setup-guide.md
 
 Step-by-step walkthrough from profile selection through client connection
-verification. Covers key generation, endpoint configuration, and QR import.
+verification. Covers key generation, endpoint configuration, desktop export,
+QR import, and the paired Apple mTLS profile flow from `wiring-harness`.
 
 ### docs/access-modes.md
 

@@ -33,8 +33,10 @@ SKIP_DNS=0
 WIREGUARD_DNS_HOSTNAME=""
 SKIP_FIREWALL=0
 WIREGUARD_FIREWALL_ZONE="trusted"
+WIREGUARD_PUBLIC_ZONE="public"
 WIREGUARD_PROFILE="wireguard-public-vpn"
 LAN_SUBNET=""
+EXPORT_CLIENT_CONFIG=""
 SERVER_CONFIG_EXPLICIT=0
 CLIENT_CONFIG_EXPLICIT=0
 SKIP_CLEANUP_PROMPT=0
@@ -51,6 +53,9 @@ Options:
                            wireguard-public-vpn, wireguard-lan-vpn.
   --server-config PATH     Local server config to install.
   --client-config PATH     Local client peer config for QR rendering.
+  --export-client-config PATH
+                           Write the validated client peer config to PATH
+                           without installing server state.
   --server-dest PATH       Destination server config path. Default: /etc/wireguard/wg0.conf
   --dns-dest PATH          Destination dnsmasq config path.
                            Default: /etc/dnsmasq.d/short-circuit-wireguard.conf
@@ -64,6 +69,8 @@ Options:
   --skip-dns               Do not install or restart the dnsmasq split-DNS helper.
   --skip-firewall          Do not update firewalld for the WireGuard interface.
   --firewall-zone ZONE     firewalld zone to assign to the WireGuard interface. Default: trusted
+  --public-zone ZONE       firewalld zone that receives inbound WireGuard UDP traffic.
+                           Default: public
   --skip-start             Do not enable or restart wg-quick@wg0 after installing config.
   --print-client-qr        Print an ANSI QR code for the client peer config.
   --qr-output PATH         Write a PNG QR code for the client peer config.
@@ -78,6 +85,9 @@ Typical flow:
   ./scripts/setup_wireguard.sh --init-local-configs --profile wireguard-public-vpn
   # edit config/wireguard/*.public-vpn.local.conf
   sudo ./scripts/setup_wireguard.sh --profile wireguard-public-vpn --print-client-qr
+
+  ./scripts/setup_wireguard.sh --profile wireguard-public-vpn \
+    --export-client-config /srv/snowbridge/share/tmp/macbook-air-wireguard.conf
 
   ./scripts/setup_wireguard.sh --init-local-configs --profile wireguard-lan-vpn --lan-subnet 192.168.0.0/24
   # edit config/wireguard/*.lan-vpn.local.conf
@@ -302,7 +312,11 @@ apply_profile_overrides_if_needed() {
 }
 
 contains_placeholders() {
-  grep -Eq '<[^>]+>' "$1"
+  awk '
+    /^[[:space:]]*#/ { next }
+    /<[^>]+>/ { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$1"
 }
 
 check_local_config() {
@@ -513,6 +527,8 @@ EOF
 install_wireguard_firewall() {
   (( SKIP_FIREWALL == 1 )) && return
 
+  local listen_port
+
   if ! command -v firewall-cmd >/dev/null 2>&1; then
     warn "firewall-cmd not found; skipping firewalld integration for ${INTERFACE_NAME}"
     return
@@ -523,15 +539,27 @@ install_wireguard_firewall() {
     return
   fi
 
+  listen_port="$(extract_first_config_value "${SERVER_CONFIG}" "ListenPort")"
+  [[ -n "${listen_port}" ]] || listen_port="51820"
+
+  if firewall-cmd --permanent --zone="${WIREGUARD_PUBLIC_ZONE}" --query-port="${listen_port}/udp" >/dev/null 2>&1; then
+    log "firewalld already allows udp/${listen_port} in zone ${WIREGUARD_PUBLIC_ZONE}"
+  else
+    firewall-cmd --permanent --zone="${WIREGUARD_PUBLIC_ZONE}" --add-port="${listen_port}/udp" >/dev/null
+    log "allowed udp/${listen_port} in firewalld zone ${WIREGUARD_PUBLIC_ZONE}"
+  fi
+
   if firewall-cmd --permanent --zone="${WIREGUARD_FIREWALL_ZONE}" --query-interface="${INTERFACE_NAME}" >/dev/null 2>&1; then
     firewall-cmd --zone="${WIREGUARD_FIREWALL_ZONE}" --add-interface="${INTERFACE_NAME}" >/dev/null 2>&1 || true
     log "firewalld already maps ${INTERFACE_NAME} to zone ${WIREGUARD_FIREWALL_ZONE}"
   else
     firewall-cmd --permanent --zone="${WIREGUARD_FIREWALL_ZONE}" --add-interface="${INTERFACE_NAME}" >/dev/null
     firewall-cmd --zone="${WIREGUARD_FIREWALL_ZONE}" --add-interface="${INTERFACE_NAME}" >/dev/null 2>&1 || true
-    firewall-cmd --reload >/dev/null
     log "assigned ${INTERFACE_NAME} to firewalld zone ${WIREGUARD_FIREWALL_ZONE}"
   fi
+
+  firewall-cmd --reload >/dev/null
+  log "reloaded firewalld"
 }
 
 derive_public_key() {
@@ -634,6 +662,16 @@ render_client_qr() {
   fi
 }
 
+export_client_config() {
+  [[ -n "${EXPORT_CLIENT_CONFIG}" ]] || return
+
+  require_command install
+  check_client_export_config
+  install -d "$(dirname "${EXPORT_CLIENT_CONFIG}")"
+  install -m 600 "${CLIENT_CONFIG}" "${EXPORT_CLIENT_CONFIG}"
+  log "exported ${EXPORT_CLIENT_CONFIG}"
+}
+
 prompt_yes_no() {
   local question="$1"
   local answer
@@ -718,6 +756,10 @@ while [[ $# -gt 0 ]]; do
       CLIENT_CONFIG_EXPLICIT=1
       shift 2
       ;;
+    --export-client-config)
+      EXPORT_CLIENT_CONFIG="$2"
+      shift 2
+      ;;
     --server-dest)
       SERVER_DEST="$2"
       shift 2
@@ -752,6 +794,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --firewall-zone)
       WIREGUARD_FIREWALL_ZONE="$2"
+      shift 2
+      ;;
+    --public-zone)
+      WIREGUARD_PUBLIC_ZONE="$2"
       shift 2
       ;;
     --skip-start)
@@ -792,6 +838,18 @@ if (( INIT_LOCAL_CONFIGS == 1 )); then
     generate_missing_keys_if_needed
   fi
   log "edit the local configs, then rerun with sudo to install them"
+  exit 0
+fi
+
+if [[ -n "${EXPORT_CLIENT_CONFIG}" ]]; then
+  apply_profile_overrides_if_needed
+  if [[ -f "${SERVER_CONFIG}" ]]; then
+    generate_missing_keys_if_needed
+  fi
+  check_client_export_config
+  render_client_qr
+  export_client_config
+  log "import ${EXPORT_CLIENT_CONFIG} into the WireGuard client on the remote device"
   exit 0
 fi
 
