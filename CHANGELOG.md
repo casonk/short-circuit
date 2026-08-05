@@ -18,6 +18,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `docs/setup-guide.md`: step-by-step WireGuard setup walkthrough.
 - `docs/access-modes.md`: SMB, HTTPS, and SSH access patterns through the
   WireGuard tunnel.
+- Render-only, owner-only temporary macOS hub declarations with fresh per-node
+  keys, private-underlay validation, narrow `/32` routes, 31-day expiry,
+  duplicate-key rejection, generation-scoped artifacts, and manual handback
+  fencing.
 - Portfolio governance baseline: `AGENTS.md`, `LESSONSLEARNED.md`,
   `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.editorconfig`,
   `.pre-commit-config.yaml`, and GitHub templates.

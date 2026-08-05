@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "generation": 0,
+  "mesh": {
+    "name": "temporary-macos-host-only",
+    "subnet": "10.99.0.240/28",
+    "listen_port": 51821
+  },
+  "failover_mode": "manual-static",
+  "cutover_epoch": 0,
+  "expires_at": null,
+  "nodes": []
+}

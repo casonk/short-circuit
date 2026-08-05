@@ -16,6 +16,7 @@ keywords = ["wireguard", "vpn", "networking", "tunnel", "remote-access"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
   "Topic :: System :: Networking",
   "Topic :: Utilities",
@@ -32,8 +33,11 @@ dev = [
     "pytest",
     "ruff",
     "black",
-    "dyno_lab @ git+https://github.com/casonk/dyno-lab.git",
+    "dyno_lab @ git+https://github.com/casonk/dyno-lab.git@f040eb4dbf014b123ca81be9c1cc58857e9095a5",
 ]
+
+[tool.setuptools]
+packages = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

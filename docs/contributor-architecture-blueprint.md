@@ -20,6 +20,7 @@ Config Templates (config/wireguard/)
   wg0-server.lan-vpn.example.conf
   client-peer.example.conf         ← client interface + peer section
   client-peer.lan-vpn.example.conf
+  mesh.example.json                ← synthetic temporary-hub declaration
                           │
                           ▼ --init-local-configs
 Local Configs (gitignored *.local.conf)
@@ -54,6 +55,16 @@ Running WireGuard Tunnel
                           ▼
 LAN Forwarding
   client reaches any LAN host via host as gateway
+
+Temporary macOS Recovery Path (separate, host-only)
+  mesh.example.json -> mesh.local.json (generation zero is inert)
+  node-local key -> render_wireguard_mesh.py -> <node-id>.conf (0600)
+  fresh identity at 10.99.0.254/32
+  temporary peers at 10.99.0.241/32–10.99.0.253/32
+  active Nord underlay -> supervised wireguard-tools/wireguard-go
+  direct LAN/public endpoint -> deferred review; not renderer output
+  no forwarding, NAT, peer transit, LAN routes, or automatic failover
+  explicit expiry -> fence laptop -> restore canonical 10.99.0.1
 ```
 
 ## Key Components
@@ -65,11 +76,23 @@ generation, endpoint auto-fill, client-config export, OS package installation,
 config deploy, split-DNS setup, firewall assignment, and service lifecycle.
 Supports both profiles through a `--profile` flag.
 
+### scripts/render_wireguard_mesh.py
+
+A fail-closed, render-only tool for the temporary private-underlay topology. It
+initializes an inert local declaration, generates one node-local WireGuard key
+pair, validates manual-static cutover/expiry/address constraints, and renders
+only the requested node. Its `<node-id>.conf` is owner-only secret material;
+the adjacent `manifest.json` and stdout contain no private key or
+secret-derived digest. Rendering never activates a tunnel or writes firewall,
+forwarding, NAT, launchd, systemd, or Podman configuration.
+
 ### config/wireguard/
 
-Profile-based WireGuard configuration templates. Example configs use
-`<placeholder>` syntax throughout. Local configs (gitignored `*.local.conf`)
-are the runtime inputs for the installer.
+Profile-based WireGuard configuration templates. The conventional `.conf`
+examples use `<placeholder>` syntax. The mesh JSON example is a generation-zero
+declaration with no nodes, endpoints, or keys. Local configs (`*.local.conf`,
+`mesh.local.json`, and `mesh.local.d/`) are gitignored runtime inputs and
+outputs.
 
 ### docs/setup-guide.md
 
@@ -81,6 +104,22 @@ QR import, and the paired Apple mTLS profile flow from `wiring-harness`.
 
 Service-specific connection patterns for SMB, HTTPS, and SSH through the
 WireGuard tunnel. Covers both public-vpn and lan-vpn routing scopes.
+
+### config/wireguard/mesh.example.json
+
+Synthetic, inactive declaration for a temporary macOS host-only hub. It
+reserves a distinct address slice within `10.99.0.0/24` and contains no usable
+endpoint or key material. The corresponding gitignored private declaration
+records the underlay choice and lifecycle fence.
+
+### docs/temporary-macos-hub.md
+
+Manual recovery runbook for using a laptop while the canonical Linux server is
+unavailable. It covers fresh identity generation, the command-line path over a
+private underlay, deferred app/direct-endpoint considerations, external
+handshake checks, key-safe config handling, explicit expiry, and ordered
+handback. The Mac is a reachable application host, not a transit router or
+failover elector.
 
 ## Design Principles
 
@@ -95,6 +134,14 @@ WireGuard tunnel. Covers both public-vpn and lan-vpn routing scopes.
    are hardcoded; all names are set via `--dns-hostname` at install time.
 5. **Layered access**: the WireGuard tunnel is transport-only; SMB, HTTPS, and
    SSH services run independently on the host and are not managed by this repo.
+6. **Unique recovery identity**: a temporary listener gets a fresh key and
+   non-colliding `/32`; it never impersonates the canonical home server.
+7. **No reachability-based leadership**: tunnel availability does not grant an
+   application write lease. ACID/quorum fencing remains in the application and
+   orchestration layers.
+8. **Explicit recovery lifecycle**: temporary activation is supervised and
+   time-bounded, and handback deactivates/fences the laptop before restoring the
+   canonical server.
 
 ## Future Integration
 
@@ -102,4 +149,4 @@ WireGuard tunnel. Covers both public-vpn and lan-vpn routing scopes.
 the WireGuard tunnel established by this repo, providing SSH key management,
 bastion patterns, and host certificate workflows.
 
-Last reviewed: `2026-04-01`
+Last reviewed: `2026-08-05`
