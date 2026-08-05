@@ -21,6 +21,13 @@ so that mobile or remote clients can reach private services on the host.
 | `wireguard-public-vpn` | Host tunnel IP only | Access services on the server host |
 | `wireguard-lan-vpn` | Host + full home LAN | Access any LAN device through the tunnel |
 
+The temporary macOS recovery hub is not a third installer profile. It is a
+time-bounded, host-only declaration rendered for supervised command-line use
+over an existing private underlay. It never enables forwarding, NAT, LAN
+routes, or automatic failover. See
+[`temporary-macos-hub.md`](temporary-macos-hub.md); the normal Linux procedure
+below remains the canonical deployment path.
+
 ## 1. Initialize Local Config Files
 
 ```bash

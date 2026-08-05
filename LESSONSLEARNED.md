@@ -76,3 +76,21 @@
 - On firewalld-based systems, the VPN interface itself needs an explicit zone
   assignment; otherwise some services may silently fail because the default zone
   does not allow them.
+
+### 2026-08-05 — A temporary Mac hub needs a distinct identity and activation path
+
+- Never copy an offline server's WireGuard private key or tunnel address onto a
+  temporary laptop. Reserve a separate address slice, listener port, key pair,
+  expiry, and ordered handback so both identities cannot become active by
+  accident.
+- Do not assume two macOS Network Extension VPN applications can form a nested
+  underlay and overlay. When an existing private mesh tunnel must remain active,
+  use a separately reviewed command-line `wireguard-go`/`wg-quick` session with
+  narrow host routes, or move routed hub duties to native Linux.
+- Prove that every selected leaf can keep the private underlay and command-line
+  WireGuard overlay active simultaneously. An app-only client is not a valid
+  recovery peer merely because it supports each VPN separately, and the inner
+  UDP path is proven only by a handshake after the hub listener is active.
+- Keep the first recovery phase host-only. A successful WireGuard handshake is
+  transport evidence, not permission to enable forwarding, NAT, peer transit,
+  or application write leadership.
