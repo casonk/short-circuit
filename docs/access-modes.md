@@ -111,6 +111,11 @@ by default. This zone allows:
 To use a more restrictive zone, pass `--firewall-zone <zone>` and manually add
 the required services to that zone.
 
+These defaults describe `setup_wireguard.sh` and its conventional Linux
+profiles. They do not implement the schema-v2 NordVPN egress boundary. A
+full-tunnel egress gateway must not rely on the broad `trusted` zone as proof
+of source authorization, NAT, a kill switch, or WAN fallback prevention.
+
 ## Accessing LAN Devices (wireguard-lan-vpn Only)
 
 With the `wireguard-lan-vpn` profile and `--enable-ip-forward`:
@@ -126,6 +131,129 @@ LAN devices, or to add a static route on each device:
 ```
 Destination: 10.99.0.0/24   Gateway: <host LAN IP>
 ```
+
+## Recovery-Mesh Routing Scope
+
+Schema-v2 recovery profiles keep endpoint transport separate from routing
+scope. A leaf can reach the same WireGuard hub through a direct endpoint or
+through Nord Meshnet; that choice does not grant additional routes.
+
+| Leaf policy | Rendered `AllowedIPs` | Intended reach |
+|---|---|---|
+| Egress unauthorized, `peer_transit: false` | Hub `/32` | Services on the hub only |
+| Egress unauthorized, `peer_transit: true` | Recovery `/28` | Hub and temporary peers, after separately enabling hub forwarding |
+| Named in NordVPN egress allowlist | `0.0.0.0/0, ::/0` | Full tunnel to a reviewed Linux egress gateway |
+
+The last two rows are alternative policies, not composable capabilities.
+`mesh.peer_transit: true` and `egress.mode: nord-vpn` are rejected together in
+the current schema because a broad peer route would conflict with the exact-
+source, outbound-only egress boundary.
+
+The hub always retains one `/32` per leaf. It never assigns a default route to
+a leaf peer entry, and it never learns a leaf endpoint from the declaration.
+WireGuard learns the roaming leaf endpoint from authenticated traffic.
+
+`peer_transit: true` is only render-time intent. The manifest reports that the
+hub requires forwarding, while `activation_performed`, `routing_changed`, and
+`forwarding_enabled` remain false. The temporary macOS procedure leaves peer
+transit disabled.
+
+## NordVPN Internet Egress
+
+Nord Meshnet and NordVPN egress solve different problems:
+
+- `hub_transport.mode: nord-meshnet` is an optional outer path for the
+  WireGuard UDP exchange.
+- `egress.mode: nord-vpn` requests that Internet traffic from specifically
+  authorized leaves leave a Linux gateway through NordLynx.
+
+For an authorized leaf, the mesh renderer emits the mesh declaration's reviewed
+public IPv4 DNS servers. The same list is supplied to the Podman container as
+its public bootstrap DNS; the egress config cannot substitute a second DNS
+source. `ipv6_policy` is fixed to `block`; `::/0` is captured so native IPv6
+cannot bypass the requested privacy boundary. Routed IPv6 is not yet supported.
+
+The egress container contract accepts only its explicit
+`authorized_source_addresses`, each a WireGuard leaf `/32`, masquerades those
+sources only on `nordlynx`, and keeps forwarding default-deny if NordLynx
+disappears. Those addresses must match the mesh nodes named in
+`egress.authorized_leaf_ids` exactly.
+
+An active egress render requires `--mesh-config`. One canonical mesh binding
+records the generation, cutover epoch, expiry, normalized-document SHA-256,
+Linux gateway address and public key, WireGuard interface, public DNS,
+authorized leaf IDs, their exact sorted `/32`s, and the complete expected leaf
+public-key→exact-`/32` peer map. The egress declaration must match its
+generation, subnet, interface, and address set; peer transit must be false. This
+prevents two independently edited declarations from silently authorizing
+different traffic.
+
+The output contains 15 artifacts: three Quadlets; host-guard and route-lifecycle
+scripts/services; a managed `wg-quick` drop-in; an expiry-stop service and
+persistent expiry timer; the mesh binding; a staged `Containerfile`,
+entrypoint, and C token helper; plus the manifest. Its install map points only
+to future root-owned locations. Before the preferred route can be added, hard
+checks require native Linux, rootful Podman 5.8 or newer, `/dev/net/tun`, host
+IPv4 forwarding, `rp_filter` set to `0` or `2` for the relevant paths, and exact
+equality between the full runtime WireGuard peer map and every bound leaf public
+key and `/32`.
+
+On the hub, those WireGuard `AllowedIPs` provide the first cryptokey-routing
+anti-spoof boundary. The persistent host guard preserves it with source rules
+bound to the WireGuard input interface, an IPv4 terminal prohibit route, and
+interface-wide IPv4 and IPv6 prohibit rules. Those policy rules survive an
+nftables flush and retain the no-ordinary-WAN terminal path. The nftables layer
+adds peer-transit, private/LAN, unknown-source, bridge-to-host, and bridge-escape
+denials.
+
+A separate service adds the preferred container route only while both Podman
+reports the Nord egress container healthy and the systemd `wg-quick@` unit is
+active; it is `BindsTo`/`After` both. The fixed managed `wg-quick` drop-in
+requires and verifies the guard, wants the route service, and checks the bound
+gateway public key, listen port, exact single IPv4 address, lack of global IPv6,
+and full public-key→exact-`/32` runtime map in `ExecStartPost`. Its
+`ExecStopPost` forces cleanup after a failed start. Raw `wg-quick up`,
+`wg setconf`, and post-start peer mutation are unsupported because they bypass
+that ordering and verification.
+
+The bound UTC expiry is enforced twice. Guard installation and verification
+reject an already expired generation, while the drop-in hard-requires and orders
+itself after a persistent systemd timer scheduled for the exact `expires_at`.
+The timer is `BindsTo`/`PartOf` WireGuard without reverse ordering back to that
+unit; at the deadline its dedicated stop service stops WireGuard. The
+WireGuard-bound preferred route is then removed, but the terminal prohibit guard
+remains. Expiry is therefore runtime policy once these artifacts are installed,
+not only a render-time warning.
+
+Generation cutover atomically replaces the one fixed
+`50-short-circuit-nord-egress.conf` drop-in. The previous WireGuard and egress
+units must be masked and stopped before its guard is explicitly decommissioned;
+cleanup refuses to proceed while the WireGuard unit is unmasked/active, its
+interface exists, or a preferred route remains.
+
+NordVPN 5.2.0 is content-pinned with fixed amd64/arm64 `.deb` SHA-256 values.
+The staged C broker runs its no-positional-token login in a PTY, waits for the
+exact prompt and disabled `ECHO`/`ECHONL`, and only then disables dumps, opens
+the root-owned Podman secret, forwards/wipes it, and suppresses child output.
+No credential is present in `argv`, the environment, or a rendered artifact,
+and prompt drift fails before the secret is opened. Nord state is ephemeral and
+container replacement requires a fresh login.
+
+Rendering does not install those files, create or expose a token, build the
+image, log into Nord, start a unit, change live routing, or prove traffic. Until
+native-Linux tests cover Quadlet generation, unauthorized and spoofed sources,
+Nord connection and outage, public DNS, observed external IP, and return paths,
+a rendered profile is not an operational egress gateway.
+
+This gateway policy also cannot stop a leaf from falling back locally. If an
+authorized leaf's WireGuard interface is torn down, the WireGuard default route
+is removed and its ordinary WAN path can return. A persistent leaf-side kill
+switch has not been implemented, so end-to-end no-fallback remains a separate
+leaf integration gate.
+
+macOS cannot be selected as the schema-v2 egress gateway. The temporary Mac
+hub remains host-only because the repository does not install PF, forwarding,
+NAT, or an isolated Nord namespace there.
 
 ## Future: SSH In Depth
 

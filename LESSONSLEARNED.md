@@ -94,3 +94,89 @@
 - Keep the first recovery phase host-only. A successful WireGuard handshake is
   transport evidence, not permission to enable forwarding, NAT, peer transit,
   or application write leadership.
+
+### 2026-08-05 — Nord transport and Nord egress need separate policy fields
+
+- Keep WireGuard as the mesh identity and authenticated transport. Nord
+  Meshnet may be a per-link carrier, while NordVPN egress is an independent
+  routing decision; using “Nord” for both hides materially different trust and
+  failure boundaries.
+- Scope full-tunnel egress to named leaves and make its DNS, IPv6 behavior,
+  gateway platform, forwarding, NAT, and no-fallback requirements explicit.
+  Rendering `0.0.0.0/0` is intent, not proof that a fail-closed gateway exists.
+- Carry that authorization into every data-plane layer as the same leaf `/32`
+  set. WireGuard peer `/32` cryptokey routing is the first anti-spoof boundary;
+  container filtering and host policy routes must not widen it to the enclosing
+  mesh subnet.
+- Isolate NordVPN egress on native Linux or a rootful Linux network namespace.
+  A temporary macOS hub without reviewed selective routing must remain
+  host-only and cannot become an egress gateway merely because the Nord app is
+  connected.
+
+### 2026-08-06 — A fail-closed egress route needs one canonical mesh binding
+
+- Make a dependent egress renderer consume the authoritative mesh declaration,
+  not an independently maintained copy. Bind generation, cutover epoch, expiry,
+  canonical-document hash, Linux gateway identity, WireGuard interface, public
+  DNS, authorized leaf IDs, and their exact `/32`s into every staged generation.
+- Do not combine peer transit and commercial VPN egress until a single policy
+  can prove both safely. Blocking that combination is safer than allowing a
+  broad overlay route to bypass an exact-source Internet-egress boundary.
+- Install a terminal prohibit and nftables guard before WireGuard can accept
+  authorized traffic, and keep that guard after the container stops. Add and
+  remove only the preferred gateway route with the healthy container lifecycle;
+  ordinary service teardown must not create a physical-WAN fallback window.
+- Privileged units must consume root-owned staged scripts, bindings, and build
+  context. A rendered unit that refers to a user-writable clone or ignored
+  runtime directory crosses the trust boundary even if the generated text is
+  otherwise correct.
+- Verify host forwarding, non-strict reverse-path filtering, and one exact
+  WireGuard peer `/32` per authorized leaf immediately before enabling the
+  preferred route. Never silently mutate those host-global prerequisites.
+- Gateway-side fail-closed policy is not a leaf-side kill switch. Bringing down
+  an authorized leaf's WireGuard interface can restore its ordinary WAN route,
+  so end-to-end no-fallback is not proven until native-Linux gateway tests and a
+  persistent leaf policy have both passed.
+- Pin the NordVPN package version and per-architecture package digest when the
+  entrypoint depends on version-specific CLI behavior. Keep base-image digest
+  provenance as a separate operator review instead of overstating a syntactic
+  digest check.
+
+### 2026-08-06 — Fail-closed routing needs a single supervised runtime lifecycle
+
+- Bind every expected WireGuard leaf public key to its exact `/32`, then compare
+  the complete runtime peer map for equality before egress routing. Address-only
+  checks do not catch the wrong peer key, extra peers, or broad `AllowedIPs`.
+- Keep interface-wide IPv4 and IPv6 terminal prohibit rules outside nftables in
+  addition to the nft defense-in-depth policy. An nftables flush must not turn
+  forwarded WireGuard traffic into physical-WAN fallback.
+- Make the preferred route depend on both the healthy egress container and the
+  systemd-managed WireGuard interface. Have the `wg-quick` drop-in pull the
+  route service and perform a post-start peer-binding check so neither side can
+  win a startup race.
+- Declare raw `wg-quick`, `wg setconf`, and live peer mutation unsupported when
+  the safety contract lives in systemd dependencies. A correct drop-in cannot
+  protect an activation path that bypasses it.
+- Use one fixed managed drop-in filename and replace it atomically at generation
+  cutover. Mask and stop the old WireGuard and egress units before explicit old-
+  guard decommission so two generation dependency graphs cannot coexist and the
+  interface cannot race back during cleanup.
+- When a pinned third-party CLI has a no-positional-secret terminal flow, use a
+  fixed PTY broker: execute only the secret-free command, match the exact
+  prompt, verify terminal echo is disabled, and only then disable dumps and
+  open the secret. Bound the exchange, wipe it immediately, suppress all child
+  output, and never fall back to a credential-bearing argument. A real pinned-
+  package prompt probe belongs beside the adversarial mock regression.
+- Count and stage every build input, including helper source, in the root-owned
+  generation contract. Version pins are not content pins unless the downloaded
+  package is also checked against an expected digest.
+- Treat a bound UTC expiry as an enforced lifecycle fence, not documentation.
+  Reject expired generations during guard startup/verification and also attach
+  a persistent deadline timer to the systemd WireGuard unit. At expiry, stop
+  WireGuard so its bound preferred route is removed while terminal prohibit
+  state remains; retain the startup check for missed deadlines and clock-aware
+  defense in depth.
+- Make expiry readiness a hard, acyclic dependency: the WireGuard drop-in
+  `Requires` and orders `After` the timer, while the timer is `BindsTo`/`PartOf`
+  WireGuard without ordering itself after WireGuard. Symmetric ordering would
+  create the very startup cycle that the expiry fence is meant to prevent.

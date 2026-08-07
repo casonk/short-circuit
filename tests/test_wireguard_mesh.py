@@ -34,6 +34,54 @@ DEFAULT_EXPIRY = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=7)).strft
 
 def active_document() -> dict[str, object]:
     return {
+        "schema_version": 2,
+        "generation": 7,
+        "mesh": {
+            "name": "temporary-home",
+            "subnet": "10.99.0.240/28",
+            "listen_port": 51821,
+            "peer_transit": False,
+        },
+        "failover_mode": "manual-static",
+        "cutover_epoch": 3,
+        "expires_at": DEFAULT_EXPIRY,
+        "egress": {"mode": "disabled", "gateway_node_id": None},
+        "nodes": [
+            {
+                "id": "leaf-home",
+                "role": "leaf",
+                "platform": "linux",
+                "address": "10.99.0.241/32",
+                "public_key": PUBLIC_B,
+                "hub_transport": {
+                    "mode": "nord-meshnet",
+                    "endpoint": "100.64.10.5:51821",
+                },
+            },
+            {
+                "id": "hub-air",
+                "role": "hub",
+                "platform": "macos",
+                "address": "10.99.0.254/32",
+                "public_key": PUBLIC_A,
+            },
+            {
+                "id": "leaf-backup",
+                "role": "leaf",
+                "platform": "other",
+                "address": "10.99.0.242/32",
+                "public_key": PUBLIC_C,
+                "hub_transport": {
+                    "mode": "direct",
+                    "endpoint": "hub.example.com:51821",
+                },
+            },
+        ],
+    }
+
+
+def legacy_document() -> dict[str, object]:
+    return {
         "schema_version": 1,
         "generation": 7,
         "mesh": {
@@ -66,6 +114,19 @@ def active_document() -> dict[str, object]:
             },
         ],
     }
+
+
+def nord_egress_document() -> dict[str, object]:
+    document = active_document()
+    document["nodes"][1]["platform"] = "linux"
+    document["egress"] = {
+        "mode": "nord-vpn",
+        "gateway_node_id": "hub-air",
+        "authorized_leaf_ids": ["leaf-home"],
+        "dns_servers": ["103.86.96.100", "103.86.99.100"],
+        "ipv6_policy": "block",
+    }
+    return document
 
 
 def parse_wg_quick(text: str) -> tuple[dict[str, str], list[dict[str, str]]]:
@@ -286,7 +347,22 @@ else:
         manifest_text = first_manifest.read_text(encoding="utf-8")
         manifest = json.loads(manifest_text)
         self.assertFalse(PRIVATE_A in manifest_text)
-        self.assertFalse("sha" in manifest_text.lower() or "digest" in manifest_text.lower())
+        self.assertRegex(manifest["mesh_binding"]["document_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            manifest["mesh_binding"]["wireguard_peer_bindings"],
+            [
+                {
+                    "node_id": "leaf-backup",
+                    "address": "10.99.0.242/32",
+                    "public_key": PUBLIC_C,
+                },
+                {
+                    "node_id": "leaf-home",
+                    "address": "10.99.0.241/32",
+                    "public_key": PUBLIC_B,
+                },
+            ],
+        )
         self.assertEqual(manifest["peer_ids"], ["leaf-backup", "leaf-home"])
         self.assertFalse(manifest["activation_performed"])
         self.assertFalse(manifest["routing_changed"])
@@ -305,7 +381,7 @@ else:
                 )
         self.assertEqual(first_config.read_bytes(), before)
 
-    def test_leaf_renders_only_hub_with_private_underlay_endpoint(self) -> None:
+    def test_leaf_renders_only_hub_with_its_selected_transport(self) -> None:
         config = self.write_json("mesh.local.json", active_document())
         private_key = self.write_key("leaf-home.key", PRIVATE_B)
         result = self.run_cli(
@@ -331,6 +407,110 @@ else:
         self.assertEqual(peers[0]["PersistentKeepalive"], "25")
         self.assertFalse("leaf-backup" in rendered.read_text(encoding="utf-8"))
         self.assertFalse(PRIVATE_B in result.stdout + result.stderr)
+
+    def test_nord_egress_is_explicit_and_scoped_to_authorized_leaves(self) -> None:
+        document = nord_egress_document()
+        config = self.write_json("mesh.local.json", document)
+        leaf_key = self.write_key("leaf-home.key", PRIVATE_B)
+        result = self.run_cli(
+            "render",
+            "--config",
+            os.fspath(config),
+            "--node-id",
+            "leaf-home",
+            "--private-key-file",
+            os.fspath(leaf_key),
+            "--output-dir",
+            os.fspath(self.root / "egress-leaf"),
+            "--wg-binary",
+            os.fspath(self.fake_wg),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        interface, peers = parse_wg_quick(
+            (self.root / "egress-leaf" / "leaf-home.conf").read_text(encoding="utf-8")
+        )
+        self.assertEqual(interface["DNS"], "103.86.96.100, 103.86.99.100")
+        self.assertEqual(peers[0]["AllowedIPs"], "0.0.0.0/0, ::/0")
+        manifest = json.loads(
+            (self.root / "egress-leaf" / "manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(manifest["egress_authorized"])
+        self.assertTrue(manifest["requires_fail_closed_egress"])
+        self.assertFalse(manifest["requires_nat"])
+
+        normalized = mesh.validate_document(document)
+        unauthorized = next(node for node in normalized["nodes"] if node["id"] == "leaf-backup")
+        unauthorized_text = mesh._render_wg_quick(normalized, unauthorized, PRIVATE_B)
+        _, unauthorized_peers = parse_wg_quick(unauthorized_text)
+        self.assertEqual(unauthorized_peers[0]["AllowedIPs"], "10.99.0.254/32")
+        self.assertNotIn("DNS =", unauthorized_text)
+
+        hub = next(node for node in normalized["nodes"] if node["id"] == "hub-air")
+        hub_text = mesh._render_wg_quick(normalized, hub, PRIVATE_A)
+        _, hub_peers = parse_wg_quick(hub_text)
+        self.assertEqual(
+            {peer["AllowedIPs"] for peer in hub_peers},
+            {"10.99.0.241/32", "10.99.0.242/32"},
+        )
+        self.assertNotIn("Endpoint =", hub_text)
+        hub_manifest = json.loads(mesh._render_manifest(normalized, hub, "hub-air.conf"))
+        self.assertTrue(hub_manifest["requires_forwarding"])
+        self.assertTrue(hub_manifest["requires_nat"])
+        self.assertTrue(hub_manifest["requires_fail_closed_egress"])
+        self.assertEqual(hub_manifest["mesh_binding"]["gateway_node_id"], "hub-air")
+        self.assertEqual(hub_manifest["mesh_binding"]["wireguard_interface"], "hub-air")
+        self.assertEqual(hub_manifest["mesh_binding"]["gateway_address"], "10.99.0.254/32")
+        self.assertEqual(hub_manifest["mesh_binding"]["gateway_public_key"], PUBLIC_A)
+        self.assertEqual(hub_manifest["mesh_binding"]["cutover_epoch"], 3)
+        self.assertEqual(
+            hub_manifest["mesh_binding"]["authorized_source_addresses"],
+            ["10.99.0.241/32"],
+        )
+        self.assertEqual(
+            hub_manifest["mesh_binding"]["wireguard_peer_bindings"],
+            [
+                {
+                    "node_id": "leaf-backup",
+                    "address": "10.99.0.242/32",
+                    "public_key": PUBLIC_C,
+                },
+                {
+                    "node_id": "leaf-home",
+                    "address": "10.99.0.241/32",
+                    "public_key": PUBLIC_B,
+                },
+            ],
+        )
+
+        direct_egress = nord_egress_document()
+        direct_egress["egress"]["authorized_leaf_ids"] = ["leaf-backup"]
+        direct_normalized = mesh.validate_document(direct_egress)
+        direct_leaf = next(
+            node for node in direct_normalized["nodes"] if node["id"] == "leaf-backup"
+        )
+        _, direct_peers = parse_wg_quick(
+            mesh._render_wg_quick(direct_normalized, direct_leaf, PRIVATE_B)
+        )
+        self.assertEqual(direct_peers[0]["AllowedIPs"], "0.0.0.0/0, ::/0")
+        self.assertEqual(direct_peers[0]["Endpoint"], "hub.example.com:51821")
+
+    def test_peer_transit_routes_only_the_recovery_overlay(self) -> None:
+        document = active_document()
+        document["mesh"]["peer_transit"] = True
+        document["nodes"][1]["platform"] = "linux"
+        normalized = mesh.validate_document(document)
+        leaf = next(node for node in normalized["nodes"] if node["id"] == "leaf-home")
+        _, peers = parse_wg_quick(mesh._render_wg_quick(normalized, leaf, PRIVATE_B))
+        self.assertEqual(peers[0]["AllowedIPs"], "10.99.0.240/28")
+        hub = next(node for node in normalized["nodes"] if node["id"] == "hub-air")
+        manifest = json.loads(mesh._render_manifest(normalized, hub, "hub-air.conf"))
+        self.assertTrue(manifest["requires_forwarding"])
+        self.assertFalse(manifest["requires_nat"])
+
+        macos_hub = active_document()
+        macos_hub["mesh"]["peer_transit"] = True
+        with self.assertRaisesRegex(mesh.MeshError, "requires a Linux hub"):
+            mesh.validate_document(macos_hub)
 
     def test_node_id_is_safe_for_wg_quick_interface_and_filename(self) -> None:
         document = active_document()
@@ -450,13 +630,109 @@ else:
         with self.assertRaisesRegex(mesh.MeshError, "duplicate JSON key"):
             mesh.load_document(config)
 
+    def test_schema_v1_migrates_in_memory_without_rewriting_source(self) -> None:
+        legacy = legacy_document()
+        config = self.write_json("legacy.local.json", legacy)
+        before = config.read_bytes()
+        normalized, source_version = mesh.load_document_with_source(config)
+        self.assertEqual(source_version, 1)
+        self.assertEqual(normalized["schema_version"], 2)
+        self.assertEqual(normalized["egress"], {"mode": "disabled", "gateway_node_id": None})
+        self.assertFalse(normalized["mesh"]["peer_transit"])
+        hub = next(node for node in normalized["nodes"] if node["role"] == "hub")
+        self.assertEqual(hub["platform"], "macos")
+        self.assertNotIn("hub_transport", hub)
+        leaves = [node for node in normalized["nodes"] if node["role"] == "leaf"]
+        self.assertEqual({node["hub_transport"]["mode"] for node in leaves}, {"nord-meshnet"})
+        self.assertEqual(
+            {node["hub_transport"]["endpoint"] for node in leaves},
+            {"100.64.10.5:51821"},
+        )
+        self.assertEqual(config.read_bytes(), before)
+
+        result = self.run_cli("validate", "--config", os.fspath(config))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("schema-v1 was migrated", result.stderr)
+        self.assertIn("valid schema-v2", result.stdout)
+        self.assertEqual(config.read_bytes(), before)
+
+        legacy_direct = legacy_document()
+        legacy_direct["nodes"][1]["underlay_endpoint"] = "[192.168.50.3]:051821"
+        normalized_direct = mesh.validate_document(legacy_direct)
+        direct_leaves = [node for node in normalized_direct["nodes"] if node["role"] == "leaf"]
+        self.assertEqual(
+            {node["hub_transport"]["endpoint"] for node in direct_leaves},
+            {"192.168.50.3:51821"},
+        )
+        self.assertEqual({node["hub_transport"]["mode"] for node in direct_leaves}, {"direct"})
+
+    def test_schema_version_rejects_boolean_float_and_string_aliases(self) -> None:
+        for version in (True, False, 1.0, 2.0, "1", "2"):
+            with self.subTest(version=version):
+                document = active_document()
+                document["schema_version"] = version
+                with self.assertRaisesRegex(mesh.MeshError, "schema_version"):
+                    mesh.validate_document(document)
+
+    def test_nord_egress_requires_linux_hub_exact_gateway_and_leaf_scope(self) -> None:
+        invalid_documents = []
+
+        macos_gateway = nord_egress_document()
+        macos_gateway["nodes"][1]["platform"] = "macos"
+        invalid_documents.append(macos_gateway)
+
+        leaf_gateway = nord_egress_document()
+        leaf_gateway["egress"]["gateway_node_id"] = "leaf-home"
+        invalid_documents.append(leaf_gateway)
+
+        unknown_authorized = nord_egress_document()
+        unknown_authorized["egress"]["authorized_leaf_ids"] = ["not-present"]
+        invalid_documents.append(unknown_authorized)
+
+        hub_authorized = nord_egress_document()
+        hub_authorized["egress"]["authorized_leaf_ids"] = ["hub-air"]
+        invalid_documents.append(hub_authorized)
+
+        duplicate_authorized = nord_egress_document()
+        duplicate_authorized["egress"]["authorized_leaf_ids"] = [
+            "leaf-home",
+            "leaf-home",
+        ]
+        invalid_documents.append(duplicate_authorized)
+
+        empty_authorized = nord_egress_document()
+        empty_authorized["egress"]["authorized_leaf_ids"] = []
+        invalid_documents.append(empty_authorized)
+
+        unsafe_dns = nord_egress_document()
+        unsafe_dns["egress"]["dns_servers"] = ["192.168.1.1"]
+        invalid_documents.append(unsafe_dns)
+
+        ipv6_passthrough = nord_egress_document()
+        ipv6_passthrough["egress"]["ipv6_policy"] = "passthrough"
+        invalid_documents.append(ipv6_passthrough)
+
+        transit_egress = nord_egress_document()
+        transit_egress["mesh"]["peer_transit"] = True
+        invalid_documents.append(transit_egress)
+
+        disabled_gateway = active_document()
+        disabled_gateway["egress"]["gateway_node_id"] = "hub-air"
+        invalid_documents.append(disabled_gateway)
+
+        for candidate in invalid_documents:
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(mesh.MeshError):
+                    mesh.validate_document(candidate)
+
     def test_schema_enforces_reserved_recovery_identity_plan(self) -> None:
         broad_subnet = active_document()
         broad_subnet["mesh"]["subnet"] = "10.99.0.0/24"
 
         canonical_port = active_document()
         canonical_port["mesh"]["listen_port"] = 51820
-        canonical_port["nodes"][1]["underlay_endpoint"] = "100.64.10.5:51820"
+        canonical_port["nodes"][0]["hub_transport"]["endpoint"] = "100.64.10.5:51820"
+        canonical_port["nodes"][2]["hub_transport"]["endpoint"] = "hub.example.com:51820"
 
         wrong_hub_address = active_document()
         wrong_hub_address["nodes"][1]["address"] = "10.99.0.253/32"
@@ -465,7 +741,10 @@ else:
         canonical_server_address["nodes"][1]["address"] = "10.99.0.1/32"
 
         leaf_endpoint = active_document()
-        leaf_endpoint["nodes"][0]["underlay_endpoint"] = "192.168.50.4:51821"
+        leaf_endpoint["nodes"][1]["hub_transport"] = {
+            "mode": "direct",
+            "endpoint": "192.168.50.4:51821",
+        }
 
         for candidate in [
             broad_subnet,
@@ -478,28 +757,65 @@ else:
                 with self.assertRaises(mesh.MeshError):
                     mesh.validate_document(candidate)
 
-    def test_schema_accepts_only_private_literal_underlay_endpoints(self) -> None:
-        for endpoint in [
-            "203.0.113.8:51821",
-            "vpn.example.com:51821",
-            "10.99.0.250:51821",
-            "100.64.10.5:51820",
-            "[2001:db8::1]:51821",
-            "fd42::1:51821",
-        ]:
-            with self.subTest(endpoint=endpoint):
+    def test_schema_separates_direct_and_nord_meshnet_transports(self) -> None:
+        accepted_direct = [
+            "192.168.50.3:51821",
+            "8.8.8.8:51821",
+            "hub.example.com:51821",
+            "[fd42::1]:51821",
+            "[2001:4860::1]:51821",
+        ]
+        for endpoint in accepted_direct:
+            with self.subTest(mode="direct", endpoint=endpoint):
                 candidate = active_document()
-                candidate["nodes"][1]["underlay_endpoint"] = endpoint
+                candidate["nodes"][0]["hub_transport"] = {
+                    "mode": "direct",
+                    "endpoint": endpoint,
+                }
+                normalized = mesh.validate_document(candidate)
+                leaf = next(node for node in normalized["nodes"] if node["id"] == "leaf-home")
+                self.assertEqual(leaf["hub_transport"]["endpoint"], endpoint)
+
+        rejected_direct = [
+            "100.64.10.5:51821",
+            "10.99.0.250:51821",
+            "localhost:51821",
+            "http://hub.example.com:51821",
+            "hub.example.com:51820",
+            "fd42::1:51821",
+            "[192.168.50.3]:51821",
+        ]
+        for endpoint in rejected_direct:
+            with self.subTest(mode="direct", endpoint=endpoint):
+                candidate = active_document()
+                candidate["nodes"][0]["hub_transport"] = {
+                    "mode": "direct",
+                    "endpoint": endpoint,
+                }
                 with self.assertRaises(mesh.MeshError):
                     mesh.validate_document(candidate)
 
-        for endpoint in ["192.168.50.3:51821", "100.64.10.5:51821", "[fd42::1]:51821"]:
-            with self.subTest(endpoint=endpoint):
+        for endpoint in [
+            "192.168.50.3:51821",
+            "8.8.8.8:51821",
+            "hub.example.com:51821",
+            "100.64.10.5:51820",
+            "[fd42::1]:51821",
+            "10.99.0.250:51821",
+        ]:
+            with self.subTest(mode="nord-meshnet", endpoint=endpoint):
                 candidate = active_document()
-                candidate["nodes"][1]["underlay_endpoint"] = endpoint
-                normalized = mesh.validate_document(candidate)
-                hub = next(node for node in normalized["nodes"] if node["role"] == "hub")
-                self.assertEqual(hub["underlay_endpoint"], endpoint)
+                candidate["nodes"][0]["hub_transport"] = {
+                    "mode": "nord-meshnet",
+                    "endpoint": endpoint,
+                }
+                with self.assertRaises(mesh.MeshError):
+                    mesh.validate_document(candidate)
+
+        normalized = mesh.validate_document(active_document())
+        leaf = next(node for node in normalized["nodes"] if node["id"] == "leaf-home")
+        self.assertEqual(leaf["hub_transport"]["mode"], "nord-meshnet")
+        self.assertEqual(leaf["hub_transport"]["endpoint"], "100.64.10.5:51821")
 
     def test_schema_rejects_invalid_curve25519_public_keys_and_public_overlay(self) -> None:
         invalid_base64 = active_document()
