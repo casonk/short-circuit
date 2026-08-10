@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2026-08-06T00:00:00+09:00" agent="short-circuit" version="24.7.17" type="device" compressed="false">
   <diagram id="repo-architecture" name="Repo Architecture">
-    <mxGraphModel dx="1800" dy="1300" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1300" math="0" shadow="0">
+    <mxGraphModel dx="1800" dy="1500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1500" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="short-circuit — WireGuard mesh with optional Nord-protected outbound egress" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="title" value="short-circuit — WireGuard mesh, roaming coverage, and optional Nord-protected outbound egress" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="350" y="20" width="1100" height="40" as="geometry" />
         </mxCell>
 
@@ -131,6 +131,26 @@
         <mxCell id="e25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="egress-renderer" target="expiry"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e26" value="Requires + After" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="wg-dropin" target="expiry"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e27" value="BindsTo / PartOf / stop" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="expiry" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="roaming" value="Roaming coverage policy — render only" style="swimlane;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1230" width="1720" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="roaming-config" value="Owner-only roaming policy&lt;br&gt;trusted / isolated / off-site classes&lt;br&gt;Nord role: egress-only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="roaming">
+          <mxGeometry x="35" y="65" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="roaming-renderer" value="render_roaming_policy.py&lt;br&gt;bind current mesh generation + hub + hash&lt;br&gt;stable-primary coverage + leaf-transport alignment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="roaming">
+          <mxGeometry x="470" y="65" width="330" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="roaming-paths" value="lan-direct: trusted only&lt;br&gt;public / opaque relay: external port allowed&lt;br&gt;default-deny ingress; reviewed UDP only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="roaming">
+          <mxGeometry x="930" y="65" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="roaming-plan" value="Owner-only key-free plan&lt;br&gt;declared gaps + canonical mesh binding&lt;br&gt;reachability + profile update: false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="roaming">
+          <mxGeometry x="1400" y="65" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-config" target="roaming-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-renderer" target="roaming-paths"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-paths" target="roaming-plan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e31" value="canonical mesh binding" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="mesh-output" target="roaming-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

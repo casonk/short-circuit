@@ -180,3 +180,27 @@
   `Requires` and orders `After` the timer, while the timer is `BindsTo`/`PartOf`
   WireGuard without ordering itself after WireGuard. Symmetric ordering would
   create the very startup cycle that the expiry fence is meant to prevent.
+
+### 2026-08-09 — Guest isolation is a transport boundary, not a WireGuard failure
+
+- Sharing a WAN address or IP subnet does not prove local peer reachability.
+  Access-point client isolation can discard the UDP packet before WireGuard can
+  authenticate it; classify that WLAN separately from a trusted LAN.
+- Do not disable guest isolation merely to reach a private hub. When the router
+  cannot express a VLAN/firewall exception, keep the guest isolated and use one
+  stable public/direct or opaque UDP relay endpoint across trusted Wi-Fi,
+  isolated Wi-Fi, and off-site networks.
+- A WireGuard peer has one current endpoint, not a priority-ordered failover
+  list. Prefer a stable endpoint across network changes; treat private LAN paths
+  as explicit optimizations and never label application-writer selection as
+  network failover.
+- Keep commercial VPN egress independent from roaming transport. In the
+  outbound-only design, Nord may protect reviewed Linux egress but must not be
+  silently selected as the phone-to-mesh carrier.
+- Prefer one stable endpoint in one ordinary iPhone profile. An opaque relay can
+  accept a client-facing port such as UDP 443 while the hub retains its local
+  listener port, but the NATed hub must separately maintain an outbound relay
+  client; a rendered declaration does not provision or prove that path.
+- Define “works across networks” honestly: it covers Internet paths that permit
+  outbound UDP to the selected endpoint, not captive portals before login,
+  offline networks, or networks that block every usable outbound UDP port.

@@ -757,13 +757,16 @@ else:
                 with self.assertRaises(mesh.MeshError):
                     mesh.validate_document(candidate)
 
-    def test_schema_separates_direct_and_nord_meshnet_transports(self) -> None:
+    def test_schema_separates_direct_nord_and_opaque_relay_transports(self) -> None:
         accepted_direct = [
             "192.168.50.3:51821",
             "8.8.8.8:51821",
+            "8.8.8.8:443",
             "hub.example.com:51821",
+            "hub.example.com:443",
             "[fd42::1]:51821",
             "[2001:4860::1]:51821",
+            "[2001:4860::1]:8443",
         ]
         for endpoint in accepted_direct:
             with self.subTest(mode="direct", endpoint=endpoint):
@@ -781,7 +784,11 @@ else:
             "10.99.0.250:51821",
             "localhost:51821",
             "http://hub.example.com:51821",
-            "hub.example.com:51820",
+            "192.168.50.3:443",
+            "[fd42::1]:443",
+            "hub.example.com:0",
+            "hub.example.com:65536",
+            "hub.example.com:0443",
             "fd42::1:51821",
             "[192.168.50.3]:51821",
         ]
@@ -795,10 +802,66 @@ else:
                 with self.assertRaises(mesh.MeshError):
                     mesh.validate_document(candidate)
 
+        accepted_opaque_relays = [
+            "8.8.8.8:1",
+            "8.8.8.8:443",
+            "relay.mesh.example.com:443",
+            "[2606:4700:4700::1111]:8443",
+            "relay.mesh.example.com:65535",
+        ]
+        for endpoint in accepted_opaque_relays:
+            with self.subTest(mode="opaque-udp-relay", endpoint=endpoint):
+                candidate = active_document()
+                candidate["nodes"][0]["hub_transport"] = {
+                    "mode": "opaque-udp-relay",
+                    "endpoint": endpoint,
+                }
+                normalized = mesh.validate_document(candidate)
+                leaf = next(node for node in normalized["nodes"] if node["id"] == "leaf-home")
+                self.assertEqual(leaf["hub_transport"]["mode"], "opaque-udp-relay")
+                self.assertEqual(leaf["hub_transport"]["endpoint"], endpoint)
+
+        rejected_opaque_relays = [
+            "192.168.50.3:443",
+            "100.64.10.5:443",
+            "10.99.0.250:443",
+            "[fd42::1]:443",
+            "127.0.0.1:443",
+            "169.254.10.5:443",
+            "224.0.0.1:443",
+            "0.0.0.0:443",
+            "192.0.2.1:443",
+            "Relay.Example.com:443",
+            "relay.example.com.:443",
+            "relay.invalid:443",
+            "hub.local:443",
+            "node.home.arpa:443",
+            "relay.internal:443",
+            "relay.example:443",
+            "0x7f.0.0.1:443",
+            "192.168.001.2:443",
+            "[2606:4700::1%en0]:443",
+            "2606:4700:4700::1111:443",
+            "https://relay.mesh.example.com:443",
+            "relay.mesh.example.com:0",
+            "relay.mesh.example.com:65536",
+            "relay.mesh.example.com:0443",
+        ]
+        for endpoint in rejected_opaque_relays:
+            with self.subTest(mode="opaque-udp-relay", endpoint=endpoint):
+                candidate = active_document()
+                candidate["nodes"][0]["hub_transport"] = {
+                    "mode": "opaque-udp-relay",
+                    "endpoint": endpoint,
+                }
+                with self.assertRaises(mesh.MeshError):
+                    mesh.validate_document(candidate)
+
         for endpoint in [
             "192.168.50.3:51821",
             "8.8.8.8:51821",
             "hub.example.com:51821",
+            "100.64.10.5:443",
             "100.64.10.5:51820",
             "[fd42::1]:51821",
             "10.99.0.250:51821",
@@ -816,6 +879,26 @@ else:
         leaf = next(node for node in normalized["nodes"] if node["id"] == "leaf-home")
         self.assertEqual(leaf["hub_transport"]["mode"], "nord-meshnet")
         self.assertEqual(leaf["hub_transport"]["endpoint"], "100.64.10.5:51821")
+
+    def test_leaf_render_preserves_external_client_port(self) -> None:
+        for mode in ("direct", "opaque-udp-relay"):
+            with self.subTest(mode=mode):
+                document = active_document()
+                document["nodes"][0]["hub_transport"] = {
+                    "mode": mode,
+                    "endpoint": "relay.mesh.example.com:443",
+                }
+                normalized = mesh.validate_document(document)
+                leaf = next(
+                    node for node in normalized["nodes"] if node["id"] == "leaf-home"
+                )
+                interface, peers = parse_wg_quick(
+                    mesh._render_wg_quick(normalized, leaf, PRIVATE_B)
+                )
+                self.assertEqual(interface["Address"], "10.99.0.241/32")
+                self.assertEqual(normalized["mesh"]["listen_port"], 51821)
+                self.assertEqual(peers[0]["Endpoint"], "relay.mesh.example.com:443")
+                self.assertEqual(peers[0]["PersistentKeepalive"], "25")
 
     def test_schema_rejects_invalid_curve25519_public_keys_and_public_overlay(self) -> None:
         invalid_base64 = active_document()

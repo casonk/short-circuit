@@ -50,6 +50,19 @@ package "Per-leaf WireGuard transport" {
   Meshnet --> RecoveryHub : WireGuard UDP
 }
 
+package "Roaming coverage policy (render only)" {
+  [roaming-policy.local.json\nowner-only] as RoamingPolicy
+  [render_roaming_policy.py] as RoamingRenderer
+  [trusted WLAN\nlan-direct] as TrustedPath
+  [isolated WLAN + off-site\npublic-direct / opaque UDP relay] as StablePath
+  [key-free roaming plan\ndeclared gaps + transport alignment\nreachability/profile update false] as RoamingPlan
+
+  RoamingPolicy --> RoamingRenderer
+  RoamingRenderer --> TrustedPath : classify only
+  RoamingRenderer --> StablePath : classify only
+  RoamingRenderer --> RoamingPlan
+}
+
 package "Outbound-only NordVPN egress (Linux/rootful Podman)" {
   [egress config\nowner-only] as EgressConfig
   [render_nord_egress_container.py\n--mesh-config required] as EgressRenderer
@@ -92,7 +105,16 @@ package "Outbound-only NordVPN egress (Linux/rootful Podman)" {
 
 WgOutput ..> Direct : selected per leaf
 WgOutput ..> Meshnet : selected per leaf
+MeshBinding --> RoamingRenderer : generation + hub + canonical hash
 RecoveryHub --> HostGuard : authorized sources\nexact /32 + iif WireGuard
+
+note bottom of RoamingRenderer
+  stable-primary requires one path across trusted,
+  isolated, and off-site classes plus leaf transport alignment.
+  Public ingress: default-deny; reviewed UDP port only.
+  Nord is egress-only; reachability stays unverified.
+  No DNS, router, relay, tunnel, or iOS setting changes.
+end note
 
 note bottom of MeshBinding
   peer_transit and nord-vpn are mutually exclusive.

@@ -25,8 +25,9 @@ Declarative recovery topology (separate render-only path)
     hub  10.99.0.254/32
     leaf 10.99.0.241/32–10.99.0.253/32
     per-leaf hub_transport
-      direct       -> routable LAN/public/DNS WireGuard endpoint
-      nord-meshnet -> RFC6598 endpoint; Nord is only an outer carrier
+      direct            -> routable LAN/public/DNS WireGuard endpoint
+      opaque-udp-relay  -> stable public opaque datagram forwarder
+      nord-meshnet      -> RFC6598 endpoint; Nord is only an outer carrier
 
   Independent policy
     peer_transit false -> leaf routes hub /32 only
@@ -48,6 +49,17 @@ Declarative recovery topology (separate render-only path)
       -> exact authorized leaf /32s only
       -> default-deny forwarding, NAT only on NordLynx, IPv6 blocked
 
+  Roaming coverage (separate key-free policy)
+    roaming-policy.example.json -> ignored roaming-policy.local.json
+      + validated mesh generation/binding
+      -> render_roaming_policy.py
+      -> owner-only roaming-plan.json + roaming-plan.md
+    lan-direct          -> trusted WLAN only
+    public-direct       -> stable endpoint across declared network classes
+    opaque-udp-relay    -> forwards encrypted datagrams; does not terminate WG
+    stable-primary      -> one path must cover trusted/isolated/off-site
+    Nord role           -> egress-only; never a roaming carrier
+
   No render path activates an interface, route, firewall, forwarding, NAT,
   systemd, Podman, Nord login, failover, or application writer leadership.
   The authorized leaf still needs a persistent local no-fallback policy.
@@ -66,10 +78,12 @@ Supports both profiles through a `--profile` flag.
 
 A fail-closed, render-only tool for the temporary topology. Schema v2 validates
 the fixed recovery identity plan, node platforms, manual cutover and expiry,
-per-leaf `direct` or `nord-meshnet` transport, optional peer transit, and
-explicit `disabled` or `nord-vpn` egress. It renders only the requested node.
-The `<node-id>.conf` is owner-only secret material; the adjacent
-`manifest.json` and stdout contain no private key or secret-derived digest.
+per-leaf `direct`, `opaque-udp-relay`, or `nord-meshnet` transport, optional
+peer transit, and explicit `disabled` or `nord-vpn` egress. It renders only the
+requested node. A private direct or Nord endpoint retains the mesh listen port;
+a public mapping or opaque relay may expose another canonical UDP port. The
+`<node-id>.conf` is owner-only secret material; the adjacent `manifest.json`
+and stdout contain no private key or secret-derived digest.
 
 For authorized NordVPN-egress leaves, the WireGuard file contains default
 routes, IPv6 capture, and the declaration's DNS servers. For the Linux hub,
@@ -87,13 +101,41 @@ in memory. RFC6598 legacy endpoints map to `nord-meshnet`; other previously
 accepted private endpoints map to `direct`; peer transit and egress remain
 disabled. The CLI warns and does not rewrite the private source.
 
+### scripts/render_roaming_policy.py
+
+A separate fail-closed policy validator classifies `trusted-wlan`,
+`isolated-wlan`, and `offsite` without changing the schema-v1/v2 mesh renderer
+or its Nord-egress binding. It consumes the authoritative mesh declaration,
+checks the expected mesh generation and hub identity, and embeds the canonical
+mesh hash/binding in an owner-only, key-free decision plan.
+
+`lan-direct` accepts only a private literal endpoint and only the trusted WLAN
+class. `public-direct` and `opaque-udp-relay` require a global address or
+canonical DNS endpoint; their reviewed client-facing NAT/relay port may differ
+from the mesh listen port, while `lan-direct` must match it. Nord is fixed to
+`egress-only`. The initial
+`stable-primary` strategy does not model a WireGuard endpoint list: one selected
+path must cover all required classes. `audit-only` reports gaps; `required`
+fails closed when coverage is incomplete or the primary kind/endpoint differs
+from a mesh leaf's declared transport. `lan-direct` and `public-direct` align
+with mesh `direct`; `opaque-udp-relay` aligns with the same mesh transport mode.
+One aligned stable endpoint leaves the standard iPhone profile unchanged across
+network transitions. The plan still records reachability and profile updates
+as false. Rendering performs no router, DNS, WireGuard, iOS On-Demand, route,
+firewall, relay provisioning, or Air-side outbound relay-client action. Public
+ingress remains default-deny except for the reviewed WireGuard UDP port, with
+management protected separately. The network coverage claim excludes captive,
+offline, and all-UDP-blocked paths.
+
 ### config/wireguard/
 
 Profile-based WireGuard configuration templates. The conventional `.conf`
 examples use `<placeholder>` syntax. The schema-v2 mesh JSON example is a
 generation-zero declaration with no nodes, endpoints, or keys, with transit
-and egress disabled. Local configs (`*.local.conf`, `mesh.local.json`, and
-`mesh.local.d/`) are gitignored runtime inputs and outputs.
+and egress disabled. The roaming-policy JSON example is likewise inert and
+contains no endpoint or SSID. Local configs (`*.local.conf`,
+`mesh.local.json`, `roaming-policy.local.json`, and `mesh.local.d/`) are
+gitignored runtime inputs and outputs.
 
 ### scripts/render_nord_egress_container.py and containers/nord-egress/
 
@@ -221,10 +263,11 @@ records the underlay choice and lifecycle fence.
 ### docs/temporary-macos-hub.md
 
 Manual recovery runbook for using a laptop while the canonical Linux server is
-unavailable. It covers fresh identity generation, independent direct and Nord
-Meshnet-carried endpoints, external handshake checks, key-safe config handling,
-explicit expiry, and ordered handback. The Mac is a reachable application host,
-not a transit router, NordVPN egress gateway, or failover elector.
+unavailable. It covers fresh identity generation; direct, opaque public UDP
+relay, and Nord Meshnet-carried endpoints; external handshake checks; key-safe
+config handling; explicit expiry; and ordered handback. The Mac is a reachable
+application host, not a transit router, NordVPN egress gateway, or failover
+elector.
 
 ## Design Principles
 
@@ -262,6 +305,10 @@ not a transit router, NordVPN egress gateway, or failover elector.
     through systemd. Generation cutover atomically replaces the fixed managed
     drop-in and decommissions the masked, stopped prior generation before the
     new unit can start.
+13. **Stable endpoint before optimization**: roaming is reliable only when one
+    public/direct or opaque relay path remains reachable across trusted,
+    isolated, and off-site networks. Keep guest isolation enabled and treat
+    private LAN paths as local-only optimizations, not fallback coverage.
 
 ## Future Integration
 
@@ -269,4 +316,4 @@ not a transit router, NordVPN egress gateway, or failover elector.
 the WireGuard tunnel established by this repo, providing SSH key management,
 bastion patterns, and host certificate workflows.
 
-Last reviewed: `2026-08-06`
+Last reviewed: `2026-08-09`

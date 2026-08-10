@@ -13,8 +13,11 @@ This repo lives under:
 - Maintain profile-based configuration templates for two common access patterns:
   host-only VPN and wider home-LAN routing.
 - Render a supervised recovery topology whose WireGuard transport is
-  independent from Nord: each leaf selects either a direct endpoint or Nord
-  Meshnet as an optional carrier.
+  independent from Nord: each leaf selects a direct endpoint, an opaque UDP
+  relay, or Nord Meshnet as an optional carrier.
+- Classify trusted, isolated, and off-site networks with a render-only roaming
+  policy that fails closed until one stable public/direct or opaque relay path
+  covers every required network class.
 - Keep peer transit and Internet egress explicit. The temporary macOS hub stays
   host-only; fail-closed NordVPN egress is a separate Linux/rootful-Podman
   policy and is never inferred from tunnel reachability.
@@ -35,6 +38,8 @@ This repo lives under:
 - `scripts/setup_wireguard.sh`: installer for either profile
 - `scripts/render_wireguard_mesh.py`: fail-closed schema-v2 recovery-mesh
   renderer with schema-v1 in-memory compatibility
+- `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
+  validator and decision-plan renderer; it performs no endpoint switching
 - `scripts/render_nord_egress_container.py`: owner-only, mesh-bound renderer for
   15 inactive rootful-Linux artifacts: three Quadlets, guard/route/expiry
   lifecycle, managed `wg-quick` dependency, binding, build inputs, and manifest
@@ -43,6 +48,8 @@ This repo lives under:
 - `config/wireguard/client-peer.example.conf`: client peer template (public-vpn)
 - `config/wireguard/client-peer.lan-vpn.example.conf`: client peer template (lan-vpn)
 - `config/wireguard/mesh.example.json`: synthetic temporary-mesh declaration
+- `config/wireguard/roaming-policy.example.json`: inert roaming-policy
+  declaration with Nord restricted to outbound egress
 - `config/wireguard/nord-egress-container.example.json`: inert, credential-free
   rootful-Podman egress declaration
 - `containers/nord-egress/`: isolated Linux NordLynx egress image contract;
@@ -50,6 +57,7 @@ This repo lives under:
 - `docs/setup-guide.md`: step-by-step setup walkthrough
 - `docs/access-modes.md`: SMB, HTTPS, and SSH access patterns through the tunnel
 - `docs/temporary-macos-hub.md`: fenced temporary laptop-hub runbook
+- `docs/roaming-policy.md`: trusted/isolated/off-site path policy and relay gate
 - `docs/contributor-architecture-blueprint.md`: contributor-facing architecture
 - `docs/diagrams/repo-architecture.puml`: PlantUML architecture source
 - `docs/diagrams/repo-architecture.drawio`: draw.io architecture source
@@ -145,8 +153,10 @@ home server's key or `10.99.0.1` address.
 Schema v2 separates three concerns:
 
 - `hub_transport` is selected per leaf: `direct` reaches the WireGuard UDP
-  listener without Nord Meshnet, while `nord-meshnet` carries that same
-  WireGuard protocol over an authenticated RFC6598 Meshnet path.
+  listener or a reviewed public NAT mapping, `opaque-udp-relay` names a stable
+  public datagram forwarder that does not terminate WireGuard, and
+  `nord-meshnet` carries the same WireGuard protocol over an authenticated
+  RFC6598 Meshnet path.
 - `mesh.peer_transit` decides whether leaves receive the recovery overlay route.
   It defaults to `false` and still needs an explicitly activated forwarding
   policy on the hub. It cannot coexist with `egress.mode: nord-vpn` in the
@@ -161,6 +171,41 @@ Podman, or Nord state. The temporary Mac procedure therefore keeps
 `peer_transit: false` and egress disabled. See
 [docs/temporary-macos-hub.md](docs/temporary-macos-hub.md) for endpoint modes,
 external validation, expiry, and handback.
+
+### Roaming policy
+
+Guest isolation and cellular networks cannot reach an RFC 1918 laptop endpoint.
+The roaming-policy renderer binds a separate key-free decision plan to the
+validated mesh generation. A `lan-direct` path is valid only on trusted Wi-Fi;
+`isolated-wlan` and `offsite` require one stable public/direct listener or an
+opaque UDP relay that preserves WireGuard end-to-end encryption. Nord remains
+egress-only and is rejected as a roaming carrier.
+
+Start from the inert ignored declaration and validate it alongside the mesh:
+
+```bash
+python3 scripts/render_roaming_policy.py init
+python3 scripts/render_roaming_policy.py validate \
+  --policy config/wireguard/roaming-policy.local.json \
+  --mesh-config config/wireguard/mesh.local.json
+```
+
+`audit-only` reports missing coverage without claiming automatic failover;
+`required` refuses any policy whose stable primary path does not cover trusted,
+isolated, and off-site networks or whose kind and endpoint do not match every
+mesh leaf's declared transport. With one aligned stable endpoint, the ordinary
+rendered iPhone profile is imported once and remains unchanged across Wi-Fi and
+cellular transitions. An external relay may accept UDP `443` while Air keeps
+its generation-bound local listener on UDP `51821`; Air must maintain the
+separate outbound relay client that connects those two sides. Rendering neither
+provisions that relay nor proves reachability.
+
+This promise covers Internet-connected networks that permit outbound UDP to
+the selected port. No WireGuard profile can work before captive-portal login,
+without Internet access, or through a network that blocks all usable outbound
+UDP. Any public listener or relay must remain default-deny and expose only its
+reviewed WireGuard UDP port, with management protected separately. See
+[docs/roaming-policy.md](docs/roaming-policy.md).
 
 Start from an inert, gitignored declaration; rendering does not activate it:
 

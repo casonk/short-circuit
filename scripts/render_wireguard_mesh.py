@@ -17,6 +17,7 @@ import ipaddress
 import json
 import os
 import re
+import socket
 import stat
 import subprocess
 import sys
@@ -37,6 +38,16 @@ NODE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,14}$")
 MESH_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 DNS_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+NON_PUBLIC_DNS_SUFFIXES = (
+    "example",
+    "home.arpa",
+    "internal",
+    "invalid",
+    "local",
+    "localhost",
+    "onion",
+    "test",
+)
 
 V1_TOP_LEVEL_FIELDS = {
     "schema_version",
@@ -183,10 +194,12 @@ def _parse_underlay_endpoint(
     return endpoint
 
 
-def _split_endpoint(value: Any, label: str, listen_port: int) -> tuple[str, bool]:
+def _split_endpoint(value: Any, label: str) -> tuple[str, bool, int]:
     endpoint = _require_string(value, label)
     if any(character.isspace() for character in endpoint):
         raise MeshError(f"{label} must not contain whitespace")
+    if "%" in endpoint:
+        raise MeshError(f"{label} must not use an interface-scoped endpoint")
     if any(marker in endpoint for marker in ("://", "/", "@", "?", "#")):
         raise MeshError(f"{label} must contain only a host and port")
 
@@ -209,9 +222,9 @@ def _split_endpoint(value: Any, label: str, listen_port: int) -> tuple[str, bool
     if not port_text.isascii() or not port_text.isdecimal():
         raise MeshError(f"{label} port must be an integer")
     port = int(port_text, 10)
-    if port != listen_port or port_text != str(listen_port):
-        raise MeshError(f"{label} port must equal mesh.listen_port")
-    return host, bracketed
+    if port < 1 or port > 65535 or port_text != str(port):
+        raise MeshError(f"{label} port must be a canonical integer from 1 through 65535")
+    return host, bracketed, port
 
 
 def _validate_direct_dns_name(host: str, label: str) -> str:
@@ -222,6 +235,24 @@ def _validate_direct_dns_name(host: str, label: str) -> str:
         raise MeshError(f"{label} DNS host must be a fully qualified name without a trailing dot")
     if not all(DNS_LABEL_RE.fullmatch(part) for part in normalized.split(".")):
         raise MeshError(f"{label} DNS host is not a canonical DNS name")
+    try:
+        socket.inet_aton(normalized)
+    except OSError:
+        pass
+    else:
+        raise MeshError(f"{label} must not disguise a non-canonical IP as DNS")
+    return normalized
+
+
+def _validate_public_dns_name(host: str, label: str) -> str:
+    if not host.isascii() or host != host.lower():
+        raise MeshError(f"{label} DNS host must be lowercase ASCII")
+    normalized = _validate_direct_dns_name(host, label)
+    if any(
+        normalized == suffix or normalized.endswith(f".{suffix}")
+        for suffix in NON_PUBLIC_DNS_SUFFIXES
+    ):
+        raise MeshError(f"{label} DNS host must not use a special-use suffix")
     return normalized
 
 
@@ -234,11 +265,13 @@ def _parse_hub_transport(
     transport = _require_object(value, label)
     _require_exact_fields(transport, HUB_TRANSPORT_FIELDS, label)
     mode = _require_string(transport["mode"], f"{label}.mode")
-    if mode not in {"direct", "nord-meshnet"}:
-        raise MeshError(f"{label}.mode must be direct or nord-meshnet")
+    if mode not in {"direct", "nord-meshnet", "opaque-udp-relay"}:
+        raise MeshError(
+            f"{label}.mode must be direct, nord-meshnet, or opaque-udp-relay"
+        )
 
     endpoint_label = f"{label}.endpoint"
-    host, bracketed = _split_endpoint(transport["endpoint"], endpoint_label, listen_port)
+    host, bracketed, port = _split_endpoint(transport["endpoint"], endpoint_label)
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
@@ -246,8 +279,11 @@ def _parse_hub_transport(
             raise MeshError(f"{endpoint_label} contains an invalid IPv6 address") from None
         if mode == "nord-meshnet":
             raise MeshError(f"{endpoint_label} must use a literal RFC6598 IPv4 address") from None
-        normalized_host = _validate_direct_dns_name(host, endpoint_label)
-        return {"mode": mode, "endpoint": f"{normalized_host}:{listen_port}"}
+        if mode == "opaque-udp-relay":
+            normalized_host = _validate_public_dns_name(host, endpoint_label)
+        else:
+            normalized_host = _validate_direct_dns_name(host, endpoint_label)
+        return {"mode": mode, "endpoint": f"{normalized_host}:{port}"}
 
     if (
         address.is_unspecified
@@ -262,6 +298,16 @@ def _parse_hub_transport(
     if mode == "nord-meshnet":
         if not isinstance(address, ipaddress.IPv4Address) or address not in RFC6598_NETWORK:
             raise MeshError(f"{endpoint_label} must use a literal RFC6598 IPv4 address")
+        if port != listen_port:
+            raise MeshError(
+                f"{endpoint_label} port for nord-meshnet must equal mesh.listen_port"
+            )
+    elif mode == "opaque-udp-relay":
+        if not address.is_global or address in RFC6598_NETWORK:
+            raise MeshError(
+                f"{endpoint_label} for opaque-udp-relay must use a global IP "
+                "or canonical public FQDN"
+            )
     elif isinstance(address, ipaddress.IPv4Address):
         if address in RFC6598_NETWORK:
             raise MeshError(
@@ -269,8 +315,16 @@ def _parse_hub_transport(
             )
         if not address.is_global and not any(address in network for network in RFC1918_NETWORKS):
             raise MeshError(f"{endpoint_label} must use a public or RFC1918 unicast address")
+        if any(address in network for network in RFC1918_NETWORKS) and port != listen_port:
+            raise MeshError(
+                f"{endpoint_label} port for a private direct path must equal mesh.listen_port"
+            )
     elif not address.is_global and address not in IPV6_ULA_NETWORK:
         raise MeshError(f"{endpoint_label} must use a public or ULA unicast address")
+    elif address in IPV6_ULA_NETWORK and port != listen_port:
+        raise MeshError(
+            f"{endpoint_label} port for a private direct path must equal mesh.listen_port"
+        )
 
     normalized_host = address.compressed
     if isinstance(address, ipaddress.IPv6Address):
@@ -279,7 +333,7 @@ def _parse_hub_transport(
         normalized_host = f"[{normalized_host}]"
     elif bracketed:
         raise MeshError(f"{endpoint_label} must not put an IPv4 address inside brackets")
-    return {"mode": mode, "endpoint": f"{normalized_host}:{listen_port}"}
+    return {"mode": mode, "endpoint": f"{normalized_host}:{port}"}
 
 
 def _parse_expiry(value: Any, *, now: dt.datetime) -> str:

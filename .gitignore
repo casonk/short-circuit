@@ -10,6 +10,7 @@ runtime/
 state/
 config/wireguard/*.local.conf
 config/wireguard/mesh.local.json
+config/wireguard/roaming-policy.local.json
 config/wireguard/mesh.local.d/
 
 # Editor and OS noise

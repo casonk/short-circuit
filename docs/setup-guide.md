@@ -211,9 +211,29 @@ hub has no endpoint field. Each leaf declares exactly one path to that hub:
 ```
 
 Use `direct` for a routable LAN, public IPv4/IPv6, or canonical DNS endpoint.
-Use `nord-meshnet` only for a literal RFC6598 address supplied by Nord Meshnet.
-Both carry an ordinary WireGuard tunnel; Nord Meshnet is an optional outer
-carrier, not the mesh identity or encryption policy.
+A private LAN endpoint must retain the mesh listener port; a reviewed public
+NAT mapping may expose a different canonical UDP port. Use `nord-meshnet` only
+for a literal RFC6598 address supplied by Nord Meshnet and retain the mesh
+listener port.
+
+Use `opaque-udp-relay` when the leaf should keep one stable public endpoint and
+the relay forwards encrypted datagrams without terminating WireGuard:
+
+```json
+{
+  "hub_transport": {
+    "mode": "opaque-udp-relay",
+    "endpoint": "relay.mesh.example.com:443"
+  }
+}
+```
+
+The external relay can accept UDP `443` while Air continues listening locally
+on UDP `51821`. Air must separately initiate and maintain the outbound relay
+client; the mesh renderer neither installs that client nor provisions DNS,
+public compute, firewall policy, or the relay service. All three modes still
+carry an ordinary end-to-end WireGuard tunnel; an opaque relay never owns the
+WireGuard peer identity.
 
 The mesh policy defaults are deliberately inert:
 
@@ -233,6 +253,36 @@ the hub manifest as requiring forwarding, but does not enable that forwarding.
 `peer_transit: true` cannot coexist with `egress.mode: nord-vpn` in the current
 schema; the egress boundary deliberately accepts named leaf `/32`s rather than
 a transit-capable overlay.
+
+### Classify roaming networks before activation
+
+A private `direct` endpoint is not automatically usable from an isolated guest
+WLAN or an off-site network. Bind a separate roaming declaration to the current
+mesh and keep it in `audit-only` until one stable public/direct or opaque relay
+path covers all three required classes:
+
+```bash
+python3 scripts/render_roaming_policy.py init
+python3 scripts/render_roaming_policy.py validate \
+  --policy config/wireguard/roaming-policy.local.json \
+  --mesh-config config/wireguard/mesh.local.json
+```
+
+The first strategy is deliberately `stable-primary`: one endpoint remains
+usable as the phone changes Wi-Fi or moves to cellular. The policy does not put
+multiple endpoints behind one WireGuard peer or claim automatic failover. Once
+the mesh declaration and policy are aligned, the same ordinary iPhone profile
+and QR remain in use; switching networks does not require a second tunnel
+profile.
+`lan-direct` is limited to trusted Wi-Fi, and Nord is fixed to egress-only.
+`required` additionally demands that every mesh leaf's transport mode and
+endpoint already match the selected policy path, but the renderer does not
+update or import those profiles and always reports reachability unverified.
+It also cannot make a captive portal, an offline network, or a network that
+blocks every usable outbound UDP port carry WireGuard. Keep public
+listener/relay ingress default-deny with only the reviewed UDP port exposed and
+management separately protected. See `docs/roaming-policy.md` for relay and
+external-validation gates.
 
 NordVPN Internet egress is a separate Linux-only declaration:
 

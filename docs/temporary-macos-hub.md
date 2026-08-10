@@ -5,10 +5,11 @@ canonical home server is unavailable. In WireGuard terms the laptop is still a
 peer; “hub” describes the temporary hub-and-spoke connection shape, not a
 special WireGuard server role.
 
-WireGuard is the authenticated recovery transport in both supported endpoint
-modes. A leaf can reach the hub directly, or Nord Meshnet can carry the
-WireGuard UDP exchange over its private RFC6598 path. Nord Meshnet does not
-replace WireGuard keys, addresses, peer policy, or application authorization.
+WireGuard is the authenticated recovery transport in all supported endpoint
+modes. A leaf can reach the hub directly, use an opaque public UDP relay, or
+carry the WireGuard exchange over Nord Meshnet's private RFC6598 path. Neither
+the relay nor Nord Meshnet replaces WireGuard keys, addresses, peer policy, or
+application authorization.
 
 The Mac procedure remains host-only. It does not make the laptop a router,
 peer-transit node, home-LAN gateway, Podman bridge, or NordVPN Internet egress
@@ -118,16 +119,47 @@ A direct leaf reaches the WireGuard listener without depending on Nord Meshnet:
 }
 ```
 
-Direct mode accepts a canonical DNS name or routable unicast LAN/public IP.
-Only WireGuard UDP should be forwarded from the public edge. Never expose SMB,
-SSH, HTTPS, SFTP, Podman, or database ports as a workaround. A double-NAT path
-requires an address reservation plus the same UDP forward at both routers; an
-upstream carrier-grade NAT may make it impossible.
+Direct mode accepts a canonical DNS name or routable unicast LAN/public IP. A
+private LAN or ULA endpoint and a Nord Meshnet endpoint must use the
+generation-bound local listener port. A reviewed public direct NAT mapping may
+use a different canonical client-facing UDP port. Only WireGuard UDP should be
+forwarded from the public edge. Never expose SMB, SSH, HTTPS, SFTP, Podman, or
+database ports as a workaround. A double-NAT path requires an address
+reservation plus the reviewed UDP forward at both routers; an upstream
+carrier-grade NAT may make it impossible.
 
 Direct mode is independent from Nord, but that does not mean every simultaneous
 Nord client arrangement works. If the Nord app owns the Mac’s default route,
 prove that WireGuard replies to the remote endpoint use the expected outer
 path. Do not infer symmetric reachability from a rendered config.
+
+### Opaque UDP relay
+
+An opaque relay provides one stable public endpoint while Air remains the
+WireGuard hub and application host:
+
+```json
+{
+  "hub_transport": {
+    "mode": "opaque-udp-relay",
+    "endpoint": "relay.mesh.example.com:443"
+  }
+}
+```
+
+The iPhone profile still contains one ordinary WireGuard `Endpoint` and
+`PersistentKeepalive = 25`; it does not change when the phone moves between
+trusted Wi-Fi, isolated Wi-Fi, unrelated Wi-Fi, and cellular. The external
+relay can listen on UDP `443` while Air's local WireGuard listener remains UDP
+`51821`. Air must initiate and continuously supervise a separate outbound relay
+client that joins those ports. The relay forwards opaque UDP datagrams and must
+not receive Air's WireGuard private key or terminate the tunnel.
+
+Declaring or rendering this mode does not provision the public relay, DNS,
+default-deny firewall, or Air-side client and is not reachability evidence. The
+single-profile guarantee is limited to Internet-connected networks that permit
+outbound UDP to the chosen relay port; captive portals before login, offline
+networks, and networks blocking all usable outbound UDP remain outside scope.
 
 ### Nord Meshnet carrier
 
@@ -336,8 +368,9 @@ provisional or improperly shared key still must be replaced.
 
 Use a second device on a genuinely different network.
 
-1. Prove the selected outer path first: the direct LAN/public path or the
-   authorized Nord Meshnet address.
+1. Prove the selected outer path first: the direct LAN/public path, provisioned
+   opaque relay plus Air-side outbound client, or authorized Nord Meshnet
+   address.
 2. Bring up the supervised hub and leaf. Confirm a recent authenticated
    handshake and increasing counters at both ends.
 3. Reach `10.99.0.254`. Test an application port only when that service is
@@ -351,6 +384,18 @@ Use a second device on a genuinely different network.
 A UDP listener does not answer an arbitrary probe, and a rendered profile is
 not reachability evidence. The authenticated handshake is the first valid
 WireGuard path test.
+
+Run the separate roaming-policy audit before claiming that the temporary hub is
+usable away from the trusted WLAN. A successful local handshake proves only
+the `lan-direct` class. Guest isolation, other Wi-Fi, and cellular remain
+uncovered until a public/direct or opaque relay endpoint passes authenticated
+handshake tests using the same imported iPhone profile. “All networks” here
+means Internet paths that allow outbound UDP to the selected endpoint; it does
+not include captive/no-Internet or all-UDP-blocked networks. NordVPN must remain
+outside this carrier decision.
+Keep any public listener or relay default-deny with only its reviewed
+WireGuard UDP port exposed; protect relay management on a separate restricted
+path.
 
 ## Expiry, Fencing, and Handback
 

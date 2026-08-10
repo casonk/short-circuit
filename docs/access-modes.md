@@ -135,8 +135,9 @@ Destination: 10.99.0.0/24   Gateway: <host LAN IP>
 ## Recovery-Mesh Routing Scope
 
 Schema-v2 recovery profiles keep endpoint transport separate from routing
-scope. A leaf can reach the same WireGuard hub through a direct endpoint or
-through Nord Meshnet; that choice does not grant additional routes.
+scope. A leaf can reach the same WireGuard hub through a direct endpoint, an
+opaque UDP relay, or Nord Meshnet; that choice does not grant additional
+routes.
 
 | Leaf policy | Rendered `AllowedIPs` | Intended reach |
 |---|---|---|
@@ -157,6 +158,30 @@ WireGuard learns the roaming leaf endpoint from authenticated traffic.
 hub requires forwarding, while `activation_performed`, `routing_changed`, and
 `forwarding_enabled` remain false. The temporary macOS procedure leaves peer
 transit disabled.
+
+### Roaming across isolated and off-site networks
+
+WireGuard can learn a leaf's changing source address after authenticated
+traffic, but a phone still needs one reachable hub endpoint. Guest client
+isolation prevents an RFC 1918 `lan-direct` endpoint even when the guest shares
+the router's public address. Cellular and arbitrary external Wi-Fi have the
+same private-endpoint limitation.
+
+Use `scripts/render_roaming_policy.py` to classify `trusted-wlan`,
+`isolated-wlan`, and `offsite`. A complete declared `stable-primary` policy
+requires one public/direct listener or opaque UDP relay across all three and
+alignment with every mesh leaf's declared transport. It is still unverified:
+the renderer produces only a key-free decision plan and never changes DNS,
+router, WireGuard, firewall, or iOS On-Demand state. Public ingress must be
+default-deny except for the reviewed WireGuard UDP port. See
+`docs/roaming-policy.md`.
+
+With an aligned `opaque-udp-relay` mesh transport, the one imported iPhone
+profile keeps the same stable endpoint while its source network changes. The
+relay may expose UDP `443` while Air still listens locally on UDP `51821`, but
+Air needs a separately supervised outbound relay client and the relay must be
+provisioned before this can work. This covers Internet paths that allow the
+chosen outbound UDP port, not captive/no-Internet or all-UDP-blocked networks.
 
 ## NordVPN Internet Egress
 
