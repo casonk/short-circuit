@@ -1,0 +1,19 @@
+ARG PRODUCTION_IMAGE
+FROM ${PRODUCTION_IMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY mock-nordvpn-secure-prompt.c /tmp/mock-nordvpn-secure-prompt.c
+RUN cc -std=c11 -O2 -Wall -Wextra -Werror \
+        -o /tmp/mock-nordvpn /tmp/mock-nordvpn-secure-prompt.c \
+    && mv /usr/bin/nordvpn /usr/bin/nordvpn.real \
+    && install -o root -g root -m 0755 /tmp/mock-nordvpn /usr/bin/nordvpn \
+    && rm /tmp/mock-nordvpn /tmp/mock-nordvpn-secure-prompt.c
+
+COPY --chmod=0755 run-test.sh /usr/local/bin/run-token-login-test
+
+ENTRYPOINT ["/usr/local/bin/run-token-login-test"]

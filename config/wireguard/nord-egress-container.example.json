@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "generation": 0,
+  "enabled": false,
+  "target": {
+    "os": "linux",
+    "podman_scope": "rootful",
+    "podman_min_version": "5.8.0",
+    "quadlet_directory": "/etc/containers/systemd"
+  },
+  "build": {
+    "base_image": "docker.io/library/ubuntu@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90",
+    "image_name": "localhost/short-circuit-nord-egress",
+    "containerfile": "containers/nord-egress/Containerfile",
+    "nordvpn_package_version": "5.2.0"
+  },
+  "gateway": {
+    "id": "tc-nord-egress",
+    "hostname": "tc-nord-egress",
+    "mesh_source_subnet": "10.99.0.240/28",
+    "authorized_source_addresses": [],
+    "bridge_subnet": "10.89.77.0/29",
+    "bridge_gateway": "10.89.77.1",
+    "bridge_address": "10.89.77.2",
+    "bridge_interface": "tcne0",
+    "wireguard_interface": "wg0",
+    "peer_transit": false,
+    "podman_secret_name": "short-circuit-nordvpn-token",
+    "podman_secret_target": "/run/secrets/nordvpn-token",
+    "nord_connect": "fastest",
+    "network_mode": "isolated-bridge",
+    "fail_closed": true,
+    "ipv6_policy": "disabled-drop",
+    "crud_leadership": "none"
+  }
+}

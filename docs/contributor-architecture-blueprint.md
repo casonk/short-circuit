@@ -10,61 +10,59 @@ SMB, HTTPS, and SSH access to a home host from mobile or remote clients.
 ## Architecture Overview
 
 ```
-Profile Selection  ─────────────────────────────────────────────────
-  wireguard-public-vpn (host-only)
-  wireguard-lan-vpn    (host + full home LAN)
-                          │
-                          ▼
-Config Templates (config/wireguard/)
-  wg0-server.example.conf          ← server interface + peer section
-  wg0-server.lan-vpn.example.conf
-  client-peer.example.conf         ← client interface + peer section
-  client-peer.lan-vpn.example.conf
-  mesh.example.json                ← synthetic temporary-hub declaration
-                          │
-                          ▼ --init-local-configs
-Local Configs (gitignored *.local.conf)
-  wg0-server.<profile>.local.conf
-  client-peer.<profile>.local.conf
-                          │
-     ┌──────────────────┬─────────────────────┐
-     ▼                  ▼                     ▼
-Key Generation    Placeholder Validation   Client Export
-(wg genkey)       (fail on remaining       (.conf handoff,
-                   <...>)                   optional QR)
-     │                  │                     │
-     └──────────────────┴─────────────────────┘
-                          │
-                          ▼ sudo
-Installer (scripts/setup_wireguard.sh)
-  install /etc/wireguard/wg0.conf (600)
-  sysctl ip_forward drop-in (--enable-ip-forward)
-  dnsmasq split-DNS helper (/etc/dnsmasq.d/)
-  systemd dnsmasq drop-in (After=wg-quick@wg0)
-  firewalld WAN-port allow (udp/ListenPort on public by default)
-  firewalld zone assignment (trusted by default)
-  wg-quick@wg0 enable + start
-                          │
-                          ▼
-Running WireGuard Tunnel
-  SMB  ─ smb://10.99.0.1 or smb://<private-hostname>
-  HTTPS─ https://<private-hostname>
-  SSH  ─ ssh user@10.99.0.1
-                          │
-          (wireguard-lan-vpn only)
-                          ▼
-LAN Forwarding
-  client reaches any LAN host via host as gateway
+Conventional Linux profiles
+  config templates -> gitignored *.local.conf -> setup_wireguard.sh (root)
+    -> /etc/wireguard/wg0.conf + dnsmasq + firewalld + wg-quick@wg0
+    -> host-only services or explicitly configured home-LAN routing
 
-Temporary macOS Recovery Path (separate, host-only)
-  mesh.example.json -> mesh.local.json (generation zero is inert)
-  node-local key -> render_wireguard_mesh.py -> <node-id>.conf (0600)
-  fresh identity at 10.99.0.254/32
-  temporary peers at 10.99.0.241/32–10.99.0.253/32
-  active Nord underlay -> supervised wireguard-tools/wireguard-go
-  direct LAN/public endpoint -> deferred review; not renderer output
-  no forwarding, NAT, peer transit, LAN routes, or automatic failover
-  explicit expiry -> fence laptop -> restore canonical 10.99.0.1
+Declarative recovery topology (separate render-only path)
+  mesh.example.json (schema v2, generation zero is inert)
+    -> gitignored mesh.local.json + one node-local private key
+    -> render_wireguard_mesh.py
+    -> owner-only <node-id>.conf + key-free manifest
+
+  WireGuard identity/routing
+    hub  10.99.0.254/32
+    leaf 10.99.0.241/32–10.99.0.253/32
+    per-leaf hub_transport
+      direct            -> routable LAN/public/DNS WireGuard endpoint
+      opaque-udp-relay  -> stable public opaque datagram forwarder
+      nord-meshnet      -> RFC6598 endpoint; Nord is only an outer carrier
+
+  Independent policy
+    peer_transit false -> leaf routes hub /32 only
+    peer_transit true  -> leaf routes recovery /28; activation still required
+    egress disabled    -> no Internet route through hub
+    egress nord-vpn    -> allowlisted leaves render defaults + DNS
+      -> Linux hub required
+      -> mutually exclusive with peer_transit
+      -> render_nord_egress_container.py requires --mesh-config
+      -> binds generation/epoch/expiry/hash/gateway/interface/DNS
+         + full leaf public-key-to-exact-/32 map
+      -> 15 inert artifacts, adding expiry stop/timer and C token helper
+      -> persistent IPv4/IPv6 terminal guard before wg-quick/container
+      -> route BindsTo healthy container and systemd wg-quick unit
+      -> fixed managed drop-in verifies guard and runtime peers
+      -> expires_at gates startup and schedules persistent wg-quick stop timer
+      -> root-owned binding, scripts, services, drop-in, and build context
+      -> isolated rootful Podman/NordLynx contract
+      -> exact authorized leaf /32s only
+      -> default-deny forwarding, NAT only on NordLynx, IPv6 blocked
+
+  Roaming coverage (separate key-free policy)
+    roaming-policy.example.json -> ignored roaming-policy.local.json
+      + validated mesh generation/binding
+      -> render_roaming_policy.py
+      -> owner-only roaming-plan.json + roaming-plan.md
+    lan-direct          -> trusted WLAN only
+    public-direct       -> stable endpoint across declared network classes
+    opaque-udp-relay    -> forwards encrypted datagrams; does not terminate WG
+    stable-primary      -> one path must cover trusted/isolated/off-site
+    Nord role           -> egress-only; never a roaming carrier
+
+  No render path activates an interface, route, firewall, forwarding, NAT,
+  systemd, Podman, Nord login, failover, or application writer leadership.
+  The authorized leaf still needs a persistent local no-fallback policy.
 ```
 
 ## Key Components
@@ -78,21 +76,171 @@ Supports both profiles through a `--profile` flag.
 
 ### scripts/render_wireguard_mesh.py
 
-A fail-closed, render-only tool for the temporary private-underlay topology. It
-initializes an inert local declaration, generates one node-local WireGuard key
-pair, validates manual-static cutover/expiry/address constraints, and renders
-only the requested node. Its `<node-id>.conf` is owner-only secret material;
-the adjacent `manifest.json` and stdout contain no private key or
-secret-derived digest. Rendering never activates a tunnel or writes firewall,
-forwarding, NAT, launchd, systemd, or Podman configuration.
+A fail-closed, render-only tool for the temporary topology. Schema v2 validates
+the fixed recovery identity plan, node platforms, manual cutover and expiry,
+per-leaf `direct`, `opaque-udp-relay`, or `nord-meshnet` transport, optional
+peer transit, and explicit `disabled` or `nord-vpn` egress. It renders only the
+requested node. A private direct or Nord endpoint retains the mesh listen port;
+a public mapping or opaque relay may expose another canonical UDP port. The
+`<node-id>.conf` is owner-only secret material; the adjacent `manifest.json`
+and stdout contain no private key or secret-derived digest.
+
+For authorized NordVPN-egress leaves, the WireGuard file contains default
+routes, IPv6 capture, and the declaration's DNS servers. For the Linux hub,
+the manifest reports required forwarding, NAT, and fail-closed policy. Peer
+transit and NordVPN egress are rejected together. Those are requirements, not
+performed actions: the renderer never changes a tunnel, route, firewall,
+forwarding, NAT, launchd, systemd, Podman, or Nord state.
+
+The mesh renderer itself remains inactive, but `expires_at` is not advisory for
+a bound Linux Nord egress generation: the dependent renderer turns it into a
+UTC startup gate and a persistent systemd expiry timer.
+
+The loader continues to validate schema-v1 documents and normalizes them to v2
+in memory. RFC6598 legacy endpoints map to `nord-meshnet`; other previously
+accepted private endpoints map to `direct`; peer transit and egress remain
+disabled. The CLI warns and does not rewrite the private source.
+
+### scripts/render_roaming_policy.py
+
+A separate fail-closed policy validator classifies `trusted-wlan`,
+`isolated-wlan`, and `offsite` without changing the schema-v1/v2 mesh renderer
+or its Nord-egress binding. It consumes the authoritative mesh declaration,
+checks the expected mesh generation and hub identity, and embeds the canonical
+mesh hash/binding in an owner-only, key-free decision plan.
+
+`lan-direct` accepts only a private literal endpoint and only the trusted WLAN
+class. `public-direct` and `opaque-udp-relay` require a global address or
+canonical DNS endpoint; their reviewed client-facing NAT/relay port may differ
+from the mesh listen port, while `lan-direct` must match it. Nord is fixed to
+`egress-only`. The initial
+`stable-primary` strategy does not model a WireGuard endpoint list: one selected
+path must cover all required classes. `audit-only` reports gaps; `required`
+fails closed when coverage is incomplete or the primary kind/endpoint differs
+from a mesh leaf's declared transport. `lan-direct` and `public-direct` align
+with mesh `direct`; `opaque-udp-relay` aligns with the same mesh transport mode.
+One aligned stable endpoint leaves the standard iPhone profile unchanged across
+network transitions. The plan still records reachability and profile updates
+as false. Rendering performs no router, DNS, WireGuard, iOS On-Demand, route,
+firewall, relay provisioning, or Air-side outbound relay-client action. Public
+ingress remains default-deny except for the reviewed WireGuard UDP port, with
+management protected separately. The network coverage claim excludes captive,
+offline, and all-UDP-blocked paths.
 
 ### config/wireguard/
 
 Profile-based WireGuard configuration templates. The conventional `.conf`
-examples use `<placeholder>` syntax. The mesh JSON example is a generation-zero
-declaration with no nodes, endpoints, or keys. Local configs (`*.local.conf`,
-`mesh.local.json`, and `mesh.local.d/`) are gitignored runtime inputs and
-outputs.
+examples use `<placeholder>` syntax. The schema-v2 mesh JSON example is a
+generation-zero declaration with no nodes, endpoints, or keys, with transit
+and egress disabled. The roaming-policy JSON example is likewise inert and
+contains no endpoint or SSID. Local configs (`*.local.conf`,
+`mesh.local.json`, `roaming-policy.local.json`, and `mesh.local.d/`) are
+gitignored runtime inputs and outputs.
+
+### scripts/render_nord_egress_container.py and containers/nord-egress/
+
+The Python renderer accepts an owner-only, credential-free schema-v1 contract
+under ignored `runtime/`. Generation zero is inert. An enabled validation or
+render requires `--mesh-config`, loads that declaration through the
+authoritative mesh validator, and creates a canonical binding containing the
+generation, cutover epoch, expiry, normalized-document SHA-256, Linux gateway
+address and public key, WireGuard interface, public DNS, authorized leaf IDs,
+exact sorted `/32`s, and the full expected WireGuard leaf public-key→`/32`
+map. The egress declaration's generation, subnet, interface, and `/32` list
+must match; peer transit must remain false.
+
+An enabled generation targets native Linux, rootful Podman 5.8 or newer,
+`/etc/containers/systemd`, an isolated `/29` or `/30` bridge, the fixed
+file-mounted Podman-secret target, fail-closed mode, no CRUD leadership, and
+disabled/dropped IPv6. `mesh_source_subnet` is validation context, not
+authorization. The container's bootstrap DNS comes only from the bound mesh.
+
+Rendering produces 15 owner-only, generation-scoped staging artifacts:
+
+- three Quadlets (`.build`, `.network`, and `.container`);
+- a persistent host-guard script and service;
+- a container-lifecycle preferred-route script and service;
+- a `wg-quick` dependency drop-in;
+- an expiry-stop service and persistent expiry timer;
+- the mesh binding;
+- a staged `Containerfile`, entrypoint, and C token-login helper; and
+- the install manifest.
+
+The install map targets `/etc/containers/systemd`, `/etc/systemd/system`, and a
+generation-specific root-owned directory under `/etc/short-circuit/nord-egress`.
+Root units never refer to the user-writable repository or ignored output tree.
+The Quadlets have no `[Install]` section and remain outside systemd’s search
+path. The renderer does not create the Podman secret, pull/build the image,
+install/start a unit, log into Nord, or change a host route.
+
+The staged build context supplies an isolated Linux NordLynx egress namespace.
+It content-pins NordVPN 5.2.0 with fixed amd64/arm64 `.deb` SHA-256 values. The
+Ubuntu base uses a syntactically pinned digest whose provenance still requires
+operator review. The entrypoint requires root, `/dev/net/tun`, `NET_ADMIN`, the
+Podman secret mounted at the fixed token path, the exact authorized `/32` set,
+fail-closed mode, no CRUD leadership, and IPv6 disabled/dropped. It admits
+forwarded IPv4 only from those addresses and only to `nordlynx`, permits only
+established return traffic, and masquerades only on that interface. Loss of
+NordLynx leaves the forward policy default-deny.
+
+The pinned NordVPN 5.2 CLI supports a secret-free `nordvpn login --token`
+invocation. The C broker opens the validated CLI into a PTY, requires its exact
+prompt and disabled terminal echo, and only then disables dumps, opens the
+fixed root-owned secret, forwards/wipes it, and suppresses child output. No
+credential appears in `argv` or the environment, and there is no fallback when
+the prompt contract drifts. The helper source is staged so the root-owned build
+context is complete and reviewable; Nord runtime state remains ephemeral.
+
+WireGuard’s per-peer `/32` entries are the first cryptokey-routing anti-spoof
+boundary. The route verifier compares the complete runtime `wg show ...
+allowed-ips` map against every mesh-bound leaf public-key→exact-`/32` pair;
+broad, missing, extra, and mismatched peer entries all fail.
+
+The rendered host guard binds source rules to the WireGuard input interface,
+establishes an IPv4 terminal prohibit route plus interface-wide IPv4 and IPv6
+prohibit rules, and isolates the bridge in nftables. The policy rules survive
+an nftables flush, so loss of the nft table cannot expose an ordinary-WAN
+fallback. It is required before both `wg-quick` and the container and has no
+automatic `ExecStop`; explicit decommission refuses to remove it while
+WireGuard or preferred routes remain.
+
+The route service is `BindsTo`/`After` the healthy container, its network, and
+the systemd `wg-quick@` unit. The fixed managed `wg-quick` drop-in requires and
+verifies the guard, wants the route service, hard-requires/orders itself after
+the expiry timer, and performs complete runtime identity verification in
+`ExecStartPost`, including the gateway public key, listen port, exact single
+IPv4 address, absence of global IPv6, and complete peer map. `ExecStopPost`
+forces `wg-quick down` after any failed start. Before adding a preferred route,
+hard assertions also verify
+rootful Linux, Podman 5.8+, host IPv4 forwarding, and non-strict `rp_filter`.
+Stopping either WireGuard or the container removes only the preferred route;
+terminal rules remain.
+
+Expiry has two enforcement points. Guard installation/verification compares
+the current UTC epoch with the bound `expires_at` and rejects an expired
+generation at startup. The persistent expiry timer is
+`BindsTo`/`PartOf` the WireGuard unit and schedules the exact bound UTC deadline.
+It deliberately has no reverse `After=wg-quick@` edge; the WireGuard drop-in is
+instead `Requires`/`After` the timer, making expiry readiness a hard startup
+invariant without a dependency cycle. Its `RefuseManualStart` stop service
+stops WireGuard when the timer fires; route teardown follows through `BindsTo`,
+while the terminal guard persists. The timer catches missed deadlines after
+downtime, and the startup gate remains an independent fence.
+
+This is a systemd-only activation contract. Raw `wg-quick up`, `wg setconf`,
+or live `wg` peer mutation bypasses the dependency and verification hooks and
+is unsupported. The single fixed
+`50-short-circuit-nord-egress.conf` drop-in must be atomically replaced during
+generation cutover. The old WireGuard unit and generation services are masked
+and stopped before the old guard's explicit decommission; cleanup verifies the
+unit is masked/inactive, the interface is absent, and no preferred route
+remains. Rendered artifacts remain inert until an operator performs that
+reviewed cutover and completes native-Linux traffic tests.
+
+This protects traffic after it enters the mesh; it is not a persistent leaf-
+side kill switch. Tearing down an authorized leaf's WireGuard interface can
+restore its ordinary WAN route, so end-to-end no-fallback remains an explicit
+leaf integration gate.
 
 ### docs/setup-guide.md
 
@@ -115,11 +263,11 @@ records the underlay choice and lifecycle fence.
 ### docs/temporary-macos-hub.md
 
 Manual recovery runbook for using a laptop while the canonical Linux server is
-unavailable. It covers fresh identity generation, the command-line path over a
-private underlay, deferred app/direct-endpoint considerations, external
-handshake checks, key-safe config handling, explicit expiry, and ordered
-handback. The Mac is a reachable application host, not a transit router or
-failover elector.
+unavailable. It covers fresh identity generation; direct, opaque public UDP
+relay, and Nord Meshnet-carried endpoints; external handshake checks; key-safe
+config handling; explicit expiry; and ordered handback. The Mac is a reachable
+application host, not a transit router, NordVPN egress gateway, or failover
+elector.
 
 ## Design Principles
 
@@ -142,6 +290,25 @@ failover elector.
 8. **Explicit recovery lifecycle**: temporary activation is supervised and
    time-bounded, and handback deactivates/fences the laptop before restoring the
    canonical server.
+9. **Transport/egress separation**: WireGuard is always the authenticated mesh
+   transport. Nord Meshnet may carry its UDP packets; NordVPN egress is a
+   distinct, allowlisted Linux routing policy.
+10. **Fail-closed egress**: declaring full-tunnel routes is not enough. The
+    gateway needs isolated forwarding, Nord-only NAT, IPv6 blocking, DNS
+    control, a persistent terminal guard, a container-lifecycle preferred route,
+    and deliberate outage testing. Gateway protection does not replace a
+    persistent leaf-side no-fallback policy.
+11. **Runtime identity equality**: source-address filters are insufficient on
+    their own. Before egress routing, the complete WireGuard runtime peer map
+    must exactly equal the bound public-key→`/32` generation.
+12. **One supervised lifecycle**: fail-closed dependencies are effective only
+    through systemd. Generation cutover atomically replaces the fixed managed
+    drop-in and decommissions the masked, stopped prior generation before the
+    new unit can start.
+13. **Stable endpoint before optimization**: roaming is reliable only when one
+    public/direct or opaque relay path remains reachable across trusted,
+    isolated, and off-site networks. Keep guest isolation enabled and treat
+    private LAN paths as local-only optimizations, not fallback coverage.
 
 ## Future Integration
 
@@ -149,4 +316,4 @@ failover elector.
 the WireGuard tunnel established by this repo, providing SSH key management,
 bastion patterns, and host certificate workflows.
 
-Last reviewed: `2026-08-05`
+Last reviewed: `2026-08-09`

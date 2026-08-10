@@ -1,0 +1,6 @@
+ARG PRODUCTION_IMAGE
+FROM ${PRODUCTION_IMAGE}
+
+COPY --chmod=0755 probe-real-cli.sh /usr/local/bin/probe-real-nordvpn-prompt
+
+ENTRYPOINT ["/usr/local/bin/probe-real-nordvpn-prompt"]
