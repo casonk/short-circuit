@@ -1,0 +1,61 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS token-helper-build
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY nord-token-login.c /tmp/nord-token-login.c
+
+RUN cc -std=c11 -O2 -Wall -Wextra -Werror \
+        -o /usr/local/sbin/nord-token-login /tmp/nord-token-login.c -lutil \
+    && strip /usr/local/sbin/nord-token-login
+
+FROM ${BASE_IMAGE}
+ARG NORDVPN_PACKAGE_VERSION
+
+LABEL org.opencontainers.image.title="short-circuit NordVPN egress gateway"
+LABEL org.opencontainers.image.description="Isolated, fail-closed NordLynx egress for an allowlisted WireGuard source subnet"
+LABEL org.opencontainers.image.source="https://github.com/casonk/short-circuit"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# This follows NordVPN's documented Ubuntu container installation flow. The
+# proprietary package is fetched by its versioned official path and verified
+# against the repository index digest for each supported architecture. The
+# base image is supplied only by the validated Quadlet build argument;
+# credentials are never accepted during the build.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        coreutils \
+        iproute2 \
+        mawk \
+        nftables \
+        procps \
+        wget \
+    && architecture="$(dpkg --print-architecture)" \
+    && case "$architecture" in \
+        amd64) nordvpn_sha256=9850701f589e742e4d92c43eee1f2188262ddb71f40e5453d3a2ad79503db89b ;; \
+        arm64) nordvpn_sha256=7167223efdca6daf1f84281ed4d2781414a51a4992c51aaa5cab9eb44c979eb4 ;; \
+        *) printf '%s\n' "unsupported NordVPN package architecture: $architecture" >&2; exit 1 ;; \
+    esac \
+    && nordvpn_deb="/tmp/nordvpn_${NORDVPN_PACKAGE_VERSION}_${architecture}.deb" \
+    && wget -qO "$nordvpn_deb" \
+        "https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/n/nordvpn/nordvpn_${NORDVPN_PACKAGE_VERSION}_${architecture}.deb" \
+    && printf '%s  %s\n' "$nordvpn_sha256" "$nordvpn_deb" | sha256sum -c - \
+    && apt-get install -y --no-install-recommends "$nordvpn_deb" \
+    && gpasswd -d ubuntu nordvpn >/dev/null \
+    && test "$(getent group nordvpn | cut -d: -f4)" = "" \
+    && rm -f "$nordvpn_deb" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=0755 nord-egress-entrypoint.sh /usr/local/sbin/nord-egress-entrypoint
+COPY --from=token-helper-build --chmod=0755 \
+    /usr/local/sbin/nord-token-login /usr/local/sbin/nord-token-login
+
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/sbin/nord-egress-entrypoint"]

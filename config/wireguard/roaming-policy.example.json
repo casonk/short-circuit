@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "generation": 0,
+  "enforcement": "audit-only",
+  "nord_role": "egress-only",
+  "mesh_generation": 0,
+  "hub_node_id": null,
+  "network_classes": [],
+  "paths": [],
+  "selection": {
+    "strategy": "stable-primary",
+    "primary_path_id": null
+  }
+}

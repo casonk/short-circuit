@@ -1,209 +1,156 @@
-<?xml version='1.0' encoding='utf-8'?>
-<mxfile host="app.diagrams.net" modified="2026-04-01T00:00:00-04:00" agent="short-circuit" version="24.7.17" type="device" compressed="false">
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-06T00:00:00+09:00" agent="short-circuit" version="24.7.17" type="device" compressed="false">
   <diagram id="repo-architecture" name="Repo Architecture">
-    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+    <mxGraphModel dx="1800" dy="1500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1500" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="10" value="Profile Selection" style="swimlane;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="40" width="320" height="225" as="geometry" />
+
+        <mxCell id="title" value="short-circuit — WireGuard mesh, roaming coverage, and optional Nord-protected outbound egress" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="1100" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="11" value="wireguard-public-vpn&#10;(host-only)" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="10">
-          <mxGeometry x="20" y="100" width="130" height="60" as="geometry" />
+
+        <mxCell id="legacy" value="Conventional Linux profiles" style="swimlane;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="390" height="330" as="geometry" />
         </mxCell>
-        <mxCell id="12" value="wireguard-lan-vpn&#10;(host + full LAN)" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="10">
-          <mxGeometry x="170" y="90" width="130" height="60" as="geometry" />
+        <mxCell id="legacy-config" value="public-vpn / lan-vpn&lt;br&gt;*.example.conf → *.local.conf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legacy">
+          <mxGeometry x="35" y="60" width="320" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="20" value="Config Templates (config/wireguard/)" style="swimlane;fillColor=#f5f5f5;strokeColor=#555555;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="400" y="40" width="360" height="215" as="geometry" />
+        <mxCell id="legacy-installer" value="setup_wireguard.sh&lt;br&gt;root installer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legacy">
+          <mxGeometry x="35" y="155" width="320" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="21" value="wg0-server.example.conf&#10;wg0-server.lan-vpn.example.conf" style="rounded=1;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="20">
-          <mxGeometry x="20" y="40" width="150" height="225" as="geometry" />
+        <mxCell id="legacy-runtime" value="wg-quick + dnsmasq + firewalld&lt;br&gt;No NordVPN egress implementation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legacy">
+          <mxGeometry x="35" y="245" width="320" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="22" value="client-peer.example.conf&#10;client-peer.lan-vpn.example.conf" style="rounded=1;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="20">
-          <mxGeometry x="190" y="40" width="150" height="225" as="geometry" />
+
+        <mxCell id="declaration" value="Schema-v2 recovery declaration (render only)" style="swimlane;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="90" width="570" height="330" as="geometry" />
         </mxCell>
-        <mxCell id="30" value="Local Configs (gitignored *.local.conf)" style="swimlane;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="800" y="40" width="360" height="120" as="geometry" />
+        <mxCell id="mesh-local" value="mesh.local.json&lt;br&gt;v2 or v1 normalized in memory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="declaration">
+          <mxGeometry x="30" y="60" width="220" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="31" value="wg0-server.&lt;profile&gt;.local.conf" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="30">
-          <mxGeometry x="20" y="40" width="150" height="225" as="geometry" />
+        <mxCell id="node-key" value="Node-local private key&lt;br&gt;owner-only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="declaration">
+          <mxGeometry x="320" y="60" width="220" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="32" value="client-peer.&lt;profile&gt;.local.conf" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="30">
-          <mxGeometry x="190" y="40" width="150" height="225" as="geometry" />
+        <mxCell id="mesh-renderer" value="render_wireguard_mesh.py&lt;br&gt;validate + render selected node" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="declaration">
+          <mxGeometry x="175" y="155" width="220" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="40" value="scripts/setup_wireguard.sh" style="swimlane;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="400" y="315" width="760" height="160" as="geometry" />
+        <mxCell id="mesh-output" value="WireGuard .conf (secret)&lt;br&gt;+ manifest / canonical binding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="declaration">
+          <mxGeometry x="175" y="250" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="41" value="--init-local-configs" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40">
-          <mxGeometry x="20" y="280" width="140" height="50" as="geometry" />
+
+        <mxCell id="transport" value="Per-leaf WireGuard hub_transport" style="swimlane;html=1;fillColor=#f5f5f5;strokeColor=#555555;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="90" width="680" height="330" as="geometry" />
         </mxCell>
-        <mxCell id="42" value="Key Generation&#10;(wg genkey)" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40">
-          <mxGeometry x="190" y="175" width="140" height="50" as="geometry" />
+        <mxCell id="direct" value="direct&lt;br&gt;LAN / public / DNS endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="transport">
+          <mxGeometry x="35" y="70" width="210" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="43" value="Placeholder Validation" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40">
-          <mxGeometry x="360" y="50" width="140" height="50" as="geometry" />
+        <mxCell id="meshnet" value="nord-meshnet&lt;br&gt;RFC6598 optional outer carrier" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="transport">
+          <mxGeometry x="35" y="190" width="210" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="44" value="Installer (root)" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40">
-          <mxGeometry x="530" y="165" width="140" height="50" as="geometry" />
+        <mxCell id="hub" value="WireGuard hub&lt;br&gt;exact peer /32s&lt;br&gt;temporary macOS hub stays host-only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="transport">
+          <mxGeometry x="385" y="125" width="250" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="50" value="Host System" style="swimlane;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="400" y="545" width="760" height="160" as="geometry" />
+
+        <mxCell id="egress" value="Outbound-only NordVPN egress — native Linux / rootful Podman" style="swimlane;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="470" width="1720" height="730" as="geometry" />
         </mxCell>
-        <mxCell id="51" value="/etc/wireguard/wg0.conf" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50">
-          <mxGeometry x="20" y="50" width="160" height="215" as="geometry" />
+        <mxCell id="egress-config" value="Owner-only egress config&lt;br&gt;generation + exact source /32s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="egress">
+          <mxGeometry x="35" y="65" width="250" height="75" as="geometry" />
         </mxCell>
-        <mxCell id="52" value="dnsmasq split-DNS&#10;/etc/dnsmasq.d/" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50">
-          <mxGeometry x="200" y="505" width="160" height="50" as="geometry" />
+        <mxCell id="binding" value="Canonical mesh binding&lt;br&gt;generation / epoch / expiry / SHA-256&lt;br&gt;Linux gateway / interface / public DNS&lt;br&gt;full leaf public-key→exact-/32 map" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="egress">
+          <mxGeometry x="35" y="180" width="250" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="53" value="firewalld zone&#10;(trusted)" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50">
-          <mxGeometry x="380" y="50" width="160" height="50" as="geometry" />
+        <mxCell id="egress-renderer" value="render_nord_egress_container.py&lt;br&gt;--mesh-config required&lt;br&gt;peer_transit must be false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="egress">
+          <mxGeometry x="360" y="120" width="270" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="54" value="wg-quick@wg0" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50">
-          <mxGeometry x="560" y="165" width="160" height="50" as="geometry" />
+        <mxCell id="quadlets" value="15 inert artifacts&lt;br&gt;3 Quadlets + units + scripts&lt;br&gt;binding + build context + manifest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="egress">
+          <mxGeometry x="700" y="60" width="260" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="60" value="Tunnel Access" style="swimlane;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="400" y="785" width="760" height="120" as="geometry" />
+        <mxCell id="root-staging" value="Root-owned install map&lt;br&gt;mesh binding + C-helper build context&lt;br&gt;no user-writable runtime references" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="egress">
+          <mxGeometry x="700" y="190" width="260" height="95" as="geometry" />
         </mxCell>
-        <mxCell id="61" value="SMB&#10;smb://10.99.0.1" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="60">
-          <mxGeometry x="60" y="90" width="180" height="50" as="geometry" />
+        <mxCell id="host-guard" value="Persistent host guard&lt;br&gt;IPv4 terminal route + IPv4/IPv6 iif prohibit&lt;br&gt;survives nftables flush&lt;br&gt;before wg-quick and container" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" vertex="1" parent="egress">
+          <mxGeometry x="1030" y="55" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="62" value="HTTPS&#10;https://host.vpn.internal" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="60">
-          <mxGeometry x="290" y="40" width="180" height="50" as="geometry" />
+        <mxCell id="wg-dropin" value="Fixed managed wg-quick drop-in&lt;br&gt;Requires guard + expiry; After expiry&lt;br&gt;Wants route; ExecStartPost verifies full peer map" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="egress">
+          <mxGeometry x="1030" y="215" width="280" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="63" value="SSH&#10;ssh user@10.99.0.1" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="60">
-          <mxGeometry x="520" y="90" width="180" height="50" as="geometry" />
+        <mxCell id="route-life" value="Preferred-route lifecycle&lt;br&gt;BindsTo / After container + wg-quick&lt;br&gt;removes preferred route only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="egress">
+          <mxGeometry x="1375" y="115" width="270" height="95" as="geometry" />
         </mxCell>
-        <mxCell id="70" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="11" target="41" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="85" y="184" />
-              <mxPoint x="72" y="184" />
-              <mxPoint x="72" y="256" />
-              <mxPoint x="60" y="256" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="token-helper" value="Bounded PTY broker&lt;br&gt;no token argv/env; exact no-echo prompt&lt;br&gt;then read + wipe root secret" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="egress">
+          <mxGeometry x="360" y="355" width="270" height="105" as="geometry" />
         </mxCell>
-        <mxCell id="71" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="12" target="41" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="235" y="174" />
-              <mxPoint x="90" y="174" />
-              <mxPoint x="90" y="256" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="expiry" value="UTC expiry fence&lt;br&gt;startup verify rejects expired generation&lt;br&gt;persistent timer: BindsTo + PartOf wg-quick&lt;br&gt;no reverse After; stops at expires_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="egress">
+          <mxGeometry x="35" y="340" width="250" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="72" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="21" target="41" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="namespace" value="NordLynx namespace&lt;br&gt;content-pinned NordVPN 5.2.0 amd64/arm64 SHA-256&lt;br&gt;default-deny forwarding + IPv6 block" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="egress">
+          <mxGeometry x="700" y="355" width="300" height="115" as="geometry" />
         </mxCell>
-        <mxCell id="73" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="22" target="41" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="internet" value="Public Internet&lt;br&gt;Nord-protected outbound only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="egress">
+          <mxGeometry x="1120" y="375" width="230" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="74" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="41" target="31" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="preflight" value="Hard preflight&lt;br&gt;native Linux / rootful Podman 5.8+ / TUN&lt;br&gt;ip_forward=1 / rp_filter 0 or 2&lt;br&gt;full runtime public-key→/32 equality" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="egress">
+          <mxGeometry x="1375" y="335" width="270" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="75" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="41" target="32" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="render-note" value="Render only: no artifact installation, secret creation, image build, Nord login, unit start, route change, or live traffic test." style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="egress">
+          <mxGeometry x="35" y="535" width="400" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="76" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="31" target="42" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="cutover" value="Systemd-only atomic cutover&lt;br&gt;replace fixed managed drop-in&lt;br&gt;mask + stop + decommission old generation&lt;br&gt;raw wg-quick / wg setconf unsupported" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="egress">
+          <mxGeometry x="500" y="525" width="500" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="77" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="32" target="42" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
+        <mxCell id="leaf-note" value="No persistent leaf-side kill switch: WireGuard teardown can restore the leaf's ordinary WAN. End-to-end no-fallback remains an integration gate." style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="egress">
+          <mxGeometry x="1060" y="535" width="585" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="78" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="42" target="43" parent="40">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="260" y="151" />
-              <mxPoint x="430" y="151" />
-              <mxPoint x="430" y="124" />
-            </Array>
-          </mxGeometry>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="legacy" source="legacy-config" target="legacy-installer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="legacy" source="legacy-installer" target="legacy-runtime"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="declaration" source="mesh-local" target="mesh-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="declaration" source="node-key" target="mesh-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="declaration" source="mesh-renderer" target="mesh-output"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="WireGuard UDP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="transport" source="direct" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="WireGuard UDP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="transport" source="meshnet" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="egress-config" target="egress-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" value="exact binding" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="binding" target="egress-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="egress-renderer" target="quadlets"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="egress-renderer" target="root-staging"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="root-staging" target="host-guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" value="Requires + verifies" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="wg-dropin" target="host-guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" value="bridge isolation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="host-guard" target="namespace"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e15" value="BindsTo / After" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="route-life" target="namespace"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" value="NordLynx only" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="namespace" target="internet"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" value="manifest / --mesh-config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="mesh-output" target="binding"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e18" value="public key + exact /32 + iif WireGuard" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="hub" target="host-guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" value="Wants" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="wg-dropin" target="route-life"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" value="systemd-only / full peer verification" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="wg-dropin" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e21" value="BindsTo / After" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="route-life" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e22" value="token login" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="token-helper" target="namespace"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e23" value="atomic replace" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="cutover" target="wg-dropin"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e24" value="old guard decommission" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="cutover" target="host-guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="egress-renderer" target="expiry"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e26" value="Requires + After" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="egress" source="wg-dropin" target="expiry"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e27" value="BindsTo / PartOf / stop" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="expiry" target="hub"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="roaming" value="Roaming coverage policy — render only" style="swimlane;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1230" width="1720" height="220" as="geometry" />
         </mxCell>
-        <mxCell id="79" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="43" target="44" parent="40">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="430" y="124" />
-              <mxPoint x="488" y="124" />
-              <mxPoint x="488" y="141" />
-              <mxPoint x="600" y="141" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="roaming-config" value="Owner-only roaming policy&lt;br&gt;trusted / isolated / off-site classes&lt;br&gt;Nord role: egress-only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="roaming">
+          <mxGeometry x="35" y="65" width="300" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="80" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="44" target="51" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="506" y="190" />
-              <mxPoint x="506" y="8" />
-              <mxPoint x="204" y="8" />
-              <mxPoint x="204" y="157.5" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="roaming-renderer" value="render_roaming_policy.py&lt;br&gt;bind current mesh generation + hub + hash&lt;br&gt;stable-primary coverage + leaf-transport alignment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="roaming">
+          <mxGeometry x="470" y="65" width="330" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="81" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="44" target="52" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="600" y="239" />
-              <mxPoint x="368" y="239" />
-              <mxPoint x="368" y="481" />
-              <mxPoint x="280" y="481" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="roaming-paths" value="lan-direct: trusted only&lt;br&gt;public / opaque relay: external port allowed&lt;br&gt;default-deny ingress; reviewed UDP only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="roaming">
+          <mxGeometry x="930" y="65" width="340" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="82" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="44" target="53" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="600" y="141" />
-              <mxPoint x="460" y="141" />
-              <mxPoint x="460" y="124" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="roaming-plan" value="Owner-only key-free plan&lt;br&gt;declared gaps + canonical mesh binding&lt;br&gt;reachability + profile update: false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="roaming">
+          <mxGeometry x="1400" y="65" width="280" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="83" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="44" target="54" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="84" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="54" target="61" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="536" y="205" />
-              <mxPoint x="536" y="737" />
-              <mxPoint x="264" y="737" />
-              <mxPoint x="264" y="115" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="85" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="54" target="62" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points">
-              <mxPoint x="536" y="175" />
-              <mxPoint x="536" y="507" />
-              <mxPoint x="494" y="507" />
-              <mxPoint x="494" y="65" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="86" style="edgeStyle=orthogonalEdgeStyle;jumpStyle=arc;jumpSize=10;" edge="1" source="54" target="63" parent="1">
-          <mxGeometry relative="1" as="geometry" archilityManagedRoute="1">
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="87" value="pit-stop extends SSH" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="620" y="925" width="160" height="30" as="geometry" />
-        </mxCell>
+        <mxCell id="e28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-config" target="roaming-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-renderer" target="roaming-paths"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="roaming" source="roaming-paths" target="roaming-plan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e31" value="canonical mesh binding" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="mesh-output" target="roaming-renderer"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
