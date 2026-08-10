@@ -9,69 +9,146 @@ skinparam ComponentBackgroundColor #F5F5F5
 skinparam NoteBackgroundColor #FFFDE7
 skinparam NoteBorderColor #F9A825
 
-title short-circuit — WireGuard VPN Setup and Configuration
+title short-circuit — WireGuard Mesh with Optional Nord-Protected Egress
 
-package "Profile Selection" {
-  [wireguard-public-vpn\n(host-only)] as PublicVPN
-  [wireguard-lan-vpn\n(host + LAN)] as LanVPN
+package "Conventional Linux profiles" {
+  [public-vpn\nhost only] as PublicVPN
+  [lan-vpn\nhost + LAN] as LanVPN
+  [*.example.conf] as ConfExamples
+  [*.local.conf\ngitignored] as LocalConf
+  [setup_wireguard.sh\nroot installer] as Installer
+  [wg-quick + dnsmasq\n+ firewalld] as LinuxRuntime
+
+  PublicVPN --> ConfExamples
+  LanVPN --> ConfExamples
+  ConfExamples --> LocalConf
+  LocalConf --> Installer
+  Installer --> LinuxRuntime
 }
 
-package "Config Templates\n(config/wireguard/)" {
-  [wg0-server.example.conf] as ServerExample
-  [wg0-server.lan-vpn.example.conf] as ServerLanExample
-  [client-peer.example.conf] as ClientExample
-  [client-peer.lan-vpn.example.conf] as ClientLanExample
+package "Schema-v2 recovery declaration" {
+  [mesh.example.json\ninert generation 0] as MeshExample
+  [mesh.local.json\nowner-only] as MeshLocal
+  [node-local key\nowner-only] as NodeKey
+  [render_wireguard_mesh.py] as MeshRenderer
+  [WireGuard config\nowner-only] as WgOutput
+  [manifest + canonical binding\nno activation] as MeshBinding
+
+  MeshExample --> MeshLocal : initialize
+  MeshLocal --> MeshRenderer : validate v2\nor normalize v1
+  NodeKey --> MeshRenderer
+  MeshRenderer --> WgOutput
+  MeshRenderer --> MeshBinding
 }
 
-package "Local Configs (gitignored)" {
-  [wg0-server.<profile>.local.conf] as ServerLocal
-  [client-peer.<profile>.local.conf] as ClientLocal
+package "Per-leaf WireGuard transport" {
+  [direct\nLAN / public / DNS] as Direct
+  [Nord Meshnet\nRFC6598 outer carrier] as Meshnet
+  [WireGuard hub\nexact peer /32s] as RecoveryHub
+
+  Direct --> RecoveryHub : WireGuard UDP
+  Meshnet --> RecoveryHub : WireGuard UDP
 }
 
-package "scripts/setup_wireguard.sh" {
-  [--init-local-configs] as InitStep
-  [Key Generation\n(wg genkey)] as KeyGen
-  [Placeholder Validation] as Validation
-  [Installer (root)] as Installer
+package "Roaming coverage policy (render only)" {
+  [roaming-policy.local.json\nowner-only] as RoamingPolicy
+  [render_roaming_policy.py] as RoamingRenderer
+  [trusted WLAN\nlan-direct] as TrustedPath
+  [isolated WLAN + off-site\npublic-direct / opaque UDP relay] as StablePath
+  [key-free roaming plan\ndeclared gaps + transport alignment\nreachability/profile update false] as RoamingPlan
+
+  RoamingPolicy --> RoamingRenderer
+  RoamingRenderer --> TrustedPath : classify only
+  RoamingRenderer --> StablePath : classify only
+  RoamingRenderer --> RoamingPlan
 }
 
-package "Host System" {
-  [/etc/wireguard/wg0.conf] as WgConf
-  [dnsmasq split-DNS\n/etc/dnsmasq.d/] as DnsMasq
-  [firewalld zone\n(trusted)] as Firewall
-  [wg-quick@wg0] as WgService
+package "Outbound-only NordVPN egress (Linux/rootful Podman)" {
+  [egress config\nowner-only] as EgressConfig
+  [render_nord_egress_container.py\n--mesh-config required] as EgressRenderer
+  [15 inert artifacts\n3 Quadlets + units + scripts\nbinding + build context + manifest] as Artifacts
+  [root-owned mesh binding\n+ C token helper build context] as RootBinding
+  [persistent host guard\nIPv4 route + IPv4/IPv6 iif prohibit\n+ nftables defense] as HostGuard
+  [fixed wg-quick drop-in\nRequires guard + expiry; Wants route\nExecStartPost full peer check] as WgDropin
+  [preferred-route lifecycle\nBindsTo/After container + wg-quick] as RouteLifecycle
+  [UTC expiry fence\nstartup gate + persistent timer\nstops wg-quick at expires_at] as ExpiryFence
+  [bounded PTY broker\nno token argv/env; exact no-echo prompt\nthen read + wipe root secret] as TokenHelper
+  [atomic generation cutover\nmask + stop + decommission old] as Cutover
+  [NordLynx namespace\nexact authorized leaf /32s] as EgressNamespace
+  [Public Internet\nNord-protected outbound only] as Internet
+
+  EgressConfig --> EgressRenderer
+  MeshBinding --> EgressRenderer : generation + epoch + expiry\nhash + Linux gateway + interface\nDNS + leaf IDs /32s
+  MeshBinding --> EgressRenderer : full leaf public-key→exact-/32 map
+  EgressRenderer --> Artifacts : stages; does not install
+  EgressRenderer --> RootBinding
+  EgressRenderer --> HostGuard
+  EgressRenderer --> WgDropin
+  EgressRenderer --> RouteLifecycle
+  EgressRenderer --> ExpiryFence
+  EgressRenderer --> TokenHelper
+  WgDropin --> HostGuard : Requires + pre-verify
+  WgDropin --> RouteLifecycle : Wants
+  WgDropin --> ExpiryFence : Requires + After
+  WgDropin --> RecoveryHub : systemd-only start\nExecStartPost full peer check
+  HostGuard --> RecoveryHub : before wg-quick
+  HostGuard --> EgressNamespace : bridge isolation
+  Artifacts ..> EgressNamespace : describes; does not start
+  RouteLifecycle --> RecoveryHub : BindsTo + After
+  RouteLifecycle --> EgressNamespace : BindsTo + After\npreferred route only while healthy
+  ExpiryFence --> RecoveryHub : BindsTo + PartOf\nstop at deadline
+  TokenHelper --> EgressNamespace : content-pinned Nord 5.2.0 login
+  Cutover --> WgDropin : atomically replace fixed file
+  Cutover --> HostGuard : decommission only after\nold units masked/stopped
+  EgressNamespace --> Internet : NordLynx only\nIPv6 blocked
 }
 
-package "Tunnel Access" {
-  [SMB\nsmb://10.99.0.1] as SMB
-  [HTTPS\nhttps://<private-hostname>] as HTTPS
-  [SSH\nssh user@10.99.0.1] as SSH
-}
+WgOutput ..> Direct : selected per leaf
+WgOutput ..> Meshnet : selected per leaf
+MeshBinding --> RoamingRenderer : generation + hub + canonical hash
+RecoveryHub --> HostGuard : authorized sources\nexact /32 + iif WireGuard
 
-PublicVPN --> InitStep
-LanVPN --> InitStep
-ServerExample --> InitStep
-ClientExample --> InitStep
-InitStep --> ServerLocal
-InitStep --> ClientLocal
-ServerLocal --> KeyGen
-ClientLocal --> KeyGen
-KeyGen --> Validation
-ServerLocal --> Validation
-ClientLocal --> Validation
-Validation --> Installer
-Installer --> WgConf
-Installer --> DnsMasq
-Installer --> Firewall
-Installer --> WgService
-WgService --> SMB
-WgService --> HTTPS
-WgService --> SSH
-DnsMasq ..> HTTPS : resolves\nprivate hostname
+note bottom of RoamingRenderer
+  stable-primary requires one path across trusted,
+  isolated, and off-site classes plus leaf transport alignment.
+  Public ingress: default-deny; reviewed UDP port only.
+  Nord is egress-only; reachability stays unverified.
+  No DNS, router, relay, tunnel, or iOS setting changes.
+end note
 
-note bottom of SSH
-  pit-stop will extend SSH
-  access patterns in depth
+note bottom of MeshBinding
+  peer_transit and nord-vpn are mutually exclusive.
+  Public DNS belongs to the canonical mesh binding.
+end note
+
+note bottom of EgressRenderer
+  Render only: no install, secret creation, image build,
+  Nord login, systemd/Podman start, route change, or live test.
+end note
+
+note bottom of HostGuard
+  Hard preflight: native Linux, rootful Podman 5.8+,
+  ip_forward=1, rp_filter 0/2, full public-key→/32 equality.
+  IPv4/IPv6 interface prohibits survive an nftables flush.
+  Guard persists when the container stops.
+end note
+
+note bottom of WgDropin
+  Raw wg-quick up, wg setconf, and live peer mutation
+  bypass this contract and are unsupported.
+end note
+
+note bottom of ExpiryFence
+  Expired generations fail guard startup/verification.
+  Persistent UTC timer stops WireGuard at expires_at;
+  BindsTo/PartOf WireGuard, with no reverse After ordering.
+  preferred route falls away and terminal guard remains.
+end note
+
+note bottom of RecoveryHub
+  The temporary macOS hub remains host-only.
+  No persistent leaf-side kill switch is installed;
+  WireGuard teardown can restore the leaf's ordinary WAN.
 end note
 
 @enduml

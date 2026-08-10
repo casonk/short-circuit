@@ -1,44 +1,48 @@
 # Temporary macOS WireGuard Hub
 
-This runbook describes a temporary, host-only WireGuard listener on a MacBook
-while the canonical home server is unavailable. In WireGuard terms the laptop
-is still a peer; "hub" describes the temporary connection shape, not a special
-WireGuard server role.
+This runbook describes a temporary WireGuard listener on a MacBook while the
+canonical home server is unavailable. In WireGuard terms the laptop is still a
+peer; “hub” describes the temporary hub-and-spoke connection shape, not a
+special WireGuard server role.
 
-This phase intentionally does **not** make the laptop a router. A connected
-peer can reach services explicitly running on the laptop at `10.99.0.254`, but
-cannot reach another WireGuard peer, the home LAN, a Podman bridge, or the
-Internet through the laptop.
+WireGuard is the authenticated recovery transport in all supported endpoint
+modes. A leaf can reach the hub directly, use an opaque public UDP relay, or
+carry the WireGuard exchange over Nord Meshnet's private RFC6598 path. Neither
+the relay nor Nord Meshnet replaces WireGuard keys, addresses, peer policy, or
+application authorization.
+
+The Mac procedure remains host-only. It does not make the laptop a router,
+peer-transit node, home-LAN gateway, Podman bridge, or NordVPN Internet egress
+gateway. A connected leaf can reach deliberately exposed services on the
+laptop at `10.99.0.254`; all broader routing needs a separate reviewed
+activation path.
 
 The committed declaration in
 [`../config/wireguard/mesh.example.json`](../config/wireguard/mesh.example.json)
-is synthetic and inactive. Put the real endpoint, public keys, and expiry in a
-gitignored local declaration; record operational ownership in the private
-handoff log. CLI mode also needs a gitignored, owner-only source-key file. Both
-that file and the rendered `.conf` contain a private key and must remain mode
-`0600` in a protected local directory; an approved secret store may be used
-for custody outside the active session.
+is synthetic and inactive. Real endpoints, public keys, DNS choices, and expiry
+belong in a gitignored local declaration. A rendered `.conf` and its source-key
+file contain a private key and must remain owner-only (`0600`) under a protected
+local directory or approved secret store.
 
 ## Safety Contract
 
-- Generate a fresh laptop key pair. Never copy the offline home server's
+- Generate a fresh laptop key pair. Never copy the offline home server’s
   private key onto the laptop.
 - Preserve `10.99.0.1/32` for the canonical home server. The temporary epoch
   uses `10.99.0.240/28`: `.254` for the laptop and `.241` through `.253` for
-  temporary peers. Each peer owns exactly one `/32`.
-- Give remote peers only `10.99.0.254/32` in `AllowedIPs`. Do not advertise
-  `10.99.0.0/24`, a home-LAN subnet, or `0.0.0.0/0` during this phase.
-- Leave IPv4/IPv6 forwarding and NAT disabled. Do not add `pf` forwarding or
-  NAT rules and do not bind the tunnel to a Podman bridge.
-- Keep activation manual and supervised in one of the two modes below. Do not
-  add a login item, launch daemon, health-triggered takeover, or automatic
-  failover.
-- Set a real UTC expiry in the private declaration and calendar. Expiry is a
-  stop condition, not an automatic extension. Schema v1 limits an active
-  declaration to 31 days from validation time.
-- Treat application write leadership separately from tunnel reachability.
-  WireGuard can authenticate and carry packets; it cannot provide an ACID
-  writer lease or prevent split brain.
+  temporary leaves. Each identity owns exactly one `/32`.
+- Keep `mesh.peer_transit` false and egress disabled for the temporary Mac.
+  Leaves then receive only `10.99.0.254/32` in `AllowedIPs`.
+- Leave IPv4/IPv6 forwarding and NAT disabled. Do not add PF forwarding/NAT or
+  bind the tunnel to a Podman bridge.
+- Keep activation manual and supervised. Do not add a login item, launch
+  daemon, health-triggered takeover, or reachability-based failover.
+- Give every leaf exactly one selected `hub_transport`. Changing its endpoint
+  or mode is a reviewed generation/cutover change, not automatic fallback.
+- Set a real UTC expiry in the private declaration and calendar. Schema v2
+  limits an active declaration to 31 days from validation time.
+- Treat application writer leadership separately from reachability. WireGuard
+  cannot grant an ACID writer lease or prevent split brain.
 
 ## Address and Identity Plan
 
@@ -46,277 +50,380 @@ for custody outside the active session.
 |---|---:|---|
 | Canonical home server | `10.99.0.1/32` | Reserved; never assigned to the laptop |
 | Existing canonical peers | `10.99.0.2/32` onward | Keep with their original profiles |
-| Temporary peer pool | `10.99.0.241/32`–`10.99.0.253/32` | One fresh identity per device |
+| Temporary leaf pool | `10.99.0.241/32`–`10.99.0.253/32` | One fresh identity per device |
 | Temporary laptop hub | `10.99.0.254/32` | Fresh laptop-only identity |
 
-The temporary pool is inside the portfolio's canonical `10.99.0.0/24` plan,
-but does not reuse canonical addresses. Give the temporary tunnel a distinct
-name such as `temp-mac-hub`; clients should retain their canonical home-server
-tunnel as a separate, inactive profile.
+The recovery listener remains fixed at UDP `51821`, separate from the
+canonical server’s usual `51820`. Node IDs become `wg-quick` basenames and must
+match `[a-z][a-z0-9-]{0,14}`.
 
-Schema v1 fixes the recovery listener at UDP `51821` so it cannot be confused
-with the canonical server's usual `51820` listener or stale forwarding rules.
-Changing the port requires a new reviewed schema rather than an ad hoc local
-override.
+## Schema-v2 Declaration
 
-## Declaration and Render Contract
-
-The checked-in `mesh.example.json` is generation zero: `cutover_epoch` is zero,
-`expires_at` is null, and `nodes` is empty. It is safe to publish and impossible
-to render. Initializing a local declaration does not activate a tunnel.
-
-Before a private declaration can render, it must have all of the following:
+Generation zero is inert: epoch zero, null expiry, no nodes, no peer transit,
+and disabled egress. An active declaration requires:
 
 - `generation` and `cutover_epoch` of at least one;
-- a future, canonical UTC expiry such as `YYYY-MM-DDTHH:MM:SSZ`;
-- `failover_mode` fixed to `manual-static`;
-- at least two nodes with exactly one `hub` and one or more `leaf` roles;
-- unique node IDs and public keys, the hub fixed at `10.99.0.254/32`, and
-  leaves limited to `10.99.0.241/32` through `10.99.0.253/32`;
-- the exact recovery subnet `10.99.0.240/28` and listener UDP `51821`; and
-- a literal private `underlay_endpoint` plus port on the hub.
+- a future canonical UTC expiry (`YYYY-MM-DDTHH:MM:SSZ`);
+- `failover_mode: manual-static`;
+- the fixed recovery `/28` and UDP port;
+- exactly one hub and one or more leaves with unique IDs, addresses, and keys;
+- a supported `platform` on every node; and
+- exactly one `hub_transport` on each leaf and none on the hub.
 
-The hub entry uses `id`, `role`, `address`, `public_key`, and
-`underlay_endpoint`. Each leaf uses `id`, `role`, `address`, and `public_key`;
-leave its endpoint absent in this listener topology. Copy public values from
-the node-local `.pub` files—never place a private key in the JSON document.
+A host-only Mac declaration uses this policy shape:
 
-Node IDs become `wg-quick` basenames and therefore match
-`[a-z][a-z0-9-]{0,14}`. For example, use `temp-mac-hub`, not a long descriptive
-hostname. The renderer creates `<node-id>.conf` and a key-free local
-`manifest.json`. The `.conf` is complete and importable but contains the node's
-private key; the JSON manifest and command output must never contain that key
-or a secret-derived digest. Treat the manifest's private topology metadata as
-local-only even though it contains no key material.
+```json
+{
+  "mesh": {
+    "name": "temporary-macos-host-only",
+    "subnet": "10.99.0.240/28",
+    "listen_port": 51821,
+    "peer_transit": false
+  },
+  "egress": {
+    "mode": "disabled",
+    "gateway_node_id": null
+  }
+}
+```
 
-## Activation Modes and Current Scope
+The hub node identifies the local platform but has no endpoint:
 
-macOS Network Extension VPN applications cannot be assumed to nest. Apple's
-[`NETunnelProviderManager`](https://developer.apple.com/documentation/networkextension/netunnelprovidermanager)
-documentation permits only one enterprise VPN configuration to be enabled at
-a time. Because both NordVPN and WireGuard.app use Apple's VPN facilities, do
-not try to activate WireGuard.app over an active Nord tunnel.
+```json
+{
+  "id": "temp-mac-hub",
+  "role": "hub",
+  "platform": "macos",
+  "address": "10.99.0.254/32",
+  "public_key": "<hub-public-key>"
+}
+```
 
-The modes are mutually exclusive. The repository's renderer implements only
-Mode A and rejects public endpoints. Mode B is documented as a separately
-reviewed fallback, not as an activation path produced by this change.
+Copy only public values into the declaration. Never place a private key there.
 
-### Mode A: private mesh underlay with command-line WireGuard
+### Direct WireGuard transport
 
-Prefer an already authenticated private underlay, such as an existing Nord
-Meshnet relationship, when both devices can directly reach the laptop's
-private underlay address. Set the remote peer's WireGuard `Endpoint` to that
-literal private IP and the temporary UDP port. The renderer accepts RFC 1918,
-RFC 6598, or IPv6 unique-local underlay addresses, never a public address or
-hostname. Keep the WireGuard
-`AllowedIPs` narrow so the outer endpoint itself continues to use the underlay
-rather than being captured by the inner tunnel.
+A direct leaf reaches the WireGuard listener without depending on Nord Meshnet:
 
-Keep Nord connected and use the Homebrew `wireguard-tools` plus `wireguard-go`
-userspace path instead of WireGuard.app. WireGuard's
-[installation page](https://www.wireguard.com/install/) documents
-`brew install wireguard-tools` for macOS.
+```json
+{
+  "id": "leaf-direct",
+  "role": "leaf",
+  "platform": "linux",
+  "address": "10.99.0.241/32",
+  "public_key": "<leaf-public-key>",
+  "hub_transport": {
+    "mode": "direct",
+    "endpoint": "vpn.example.com:51821"
+  }
+}
+```
 
-Choose the first real leaf from the supported rows below. Both ends must keep
-the outer Nord Meshnet path active while running command-line WireGuard for the
-inner tunnel.
+Direct mode accepts a canonical DNS name or routable unicast LAN/public IP. A
+private LAN or ULA endpoint and a Nord Meshnet endpoint must use the
+generation-bound local listener port. A reviewed public direct NAT mapping may
+use a different canonical client-facing UDP port. Only WireGuard UDP should be
+forwarded from the public edge. Never expose SMB, SSH, HTTPS, SFTP, Podman, or
+database ports as a workaround. A double-NAT path requires an address
+reservation plus the reviewed UDP forward at both routers; an upstream
+carrier-grade NAT may make it impossible.
 
-| Candidate leaf | Mode A status | Requirement |
+Direct mode is independent from Nord, but that does not mean every simultaneous
+Nord client arrangement works. If the Nord app owns the Mac’s default route,
+prove that WireGuard replies to the remote endpoint use the expected outer
+path. Do not infer symmetric reachability from a rendered config.
+
+### Opaque UDP relay
+
+An opaque relay provides one stable public endpoint while Air remains the
+WireGuard hub and application host:
+
+```json
+{
+  "hub_transport": {
+    "mode": "opaque-udp-relay",
+    "endpoint": "relay.mesh.example.com:443"
+  }
+}
+```
+
+The iPhone profile still contains one ordinary WireGuard `Endpoint` and
+`PersistentKeepalive = 25`; it does not change when the phone moves between
+trusted Wi-Fi, isolated Wi-Fi, unrelated Wi-Fi, and cellular. The external
+relay can listen on UDP `443` while Air's local WireGuard listener remains UDP
+`51821`. Air must initiate and continuously supervise a separate outbound relay
+client that joins those ports. The relay forwards opaque UDP datagrams and must
+not receive Air's WireGuard private key or terminate the tunnel.
+
+Declaring or rendering this mode does not provision the public relay, DNS,
+default-deny firewall, or Air-side client and is not reachability evidence. The
+single-profile guarantee is limited to Internet-connected networks that permit
+outbound UDP to the chosen relay port; captive portals before login, offline
+networks, and networks blocking all usable outbound UDP remain outside scope.
+
+### Nord Meshnet carrier
+
+A leaf can instead carry the same WireGuard session over an already
+authenticated Nord Meshnet relationship:
+
+```json
+{
+  "hub_transport": {
+    "mode": "nord-meshnet",
+    "endpoint": "100.64.10.5:51821"
+  }
+}
+```
+
+This mode accepts only a literal RFC6598 IPv4 address. The leaf and hub must
+keep the Nord Meshnet relationship online, and the leaf must have **Remote
+access to your device** permission. Traffic-routing and local-network
+permissions are not required for the host-only listener and should remain off.
+
+macOS Network Extension VPN applications cannot be assumed to nest. Keep Nord
+connected and use Homebrew `wireguard-tools`/`wireguard-go` for the inner
+WireGuard session rather than trying to enable WireGuard.app alongside the
+Nord app. Both ends must prove that the outer Meshnet path remains reachable
+after the inner `/32` route is installed.
+
+| Candidate leaf | Nord-carrier status | Requirement |
 |---|---|---|
-| macOS | Supported for initial validation | Nord Meshnet plus Homebrew `wireguard-tools`/`wireguard-go`; do not use WireGuard.app |
-| Linux | Supported for initial validation | Nord Meshnet plus kernel/userspace `wg-quick`; verify the hub endpoint keeps its outer route |
-| iPhone or iPad | Unsupported | NordVPN and WireGuard.app cannot provide the required simultaneous outer and inner VPN layers |
-| Android, Windows, or app-only clients | Not approved for the first leaf | Use only after independently proving simultaneous outer and inner tunnels without route capture |
+| macOS | Supported for supervised validation | Nord Meshnet plus command-line WireGuard |
+| Linux | Supported for supervised validation | Nord Meshnet plus kernel/userspace `wg-quick` |
+| iPhone or iPad | Unsupported for the first validation | Two simultaneous app VPN layers are not assumed |
+| Android, Windows, app-only clients | Not initially approved | First prove simultaneous carrier and WireGuard behavior |
 
-With those tools already installed, bring the rendered file up only for the
-supervised session:
+## Peer Transit and Internet Egress Are Separate
 
-Before activation, confirm both nodes are linked and online in Nord Meshnet and
-that the required peer has **Remote access to your device** enabled. Nord's
-[permission guide](https://meshnet.nordvpn.com/features/explaining-permissions/remote-access-permissions)
-describes that per-peer control. This host-only UDP listener does not need
-traffic-routing or local-network permissions; do not widen them.
+`mesh.peer_transit: true` gives non-egress leaves the recovery `/28` route and
+marks the hub manifest as requiring forwarding. It does not enable forwarding.
+The temporary Mac runbook therefore keeps it false. The schema also rejects
+`peer_transit: true` together with `egress.mode: nord-vpn`; the current
+outbound-only egress boundary authorizes named `/32`s and is not a peer router.
 
-Do not activate against a placeholder or laptop-generated leaf identity. The
-selected leaf must generate and retain its private key locally, and the laptop
-declaration must receive only that leaf's public key before the hub is started.
+`egress.mode: nord-vpn` is not Nord Meshnet. It is a request for selected leaves
+to send Internet traffic through an isolated NordLynx gateway. The declaration
+requires:
 
-```bash
-sudo wg-quick up /absolute/protected/path/temp-mac-hub.conf
-sudo wg show  # Darwin reports the generated utun interface here
-caffeinate -s -i  # keep this supervised terminal open while the hub is needed
-# Press Ctrl-C to release the sleep assertion, then stop the tunnel:
-sudo wg-quick down /absolute/protected/path/temp-mac-hub.conf
-```
+- a hub whose `platform` is `linux`;
+- explicit `authorized_leaf_ids`;
+- one through four reviewed public IPv4 `dns_servers`; and
+- `ipv6_policy: block` until routed IPv6 is supported.
 
-Keep the laptop connected to AC power and its network session logged in. The
-`caffeinate` command is deliberately foreground-only: it is not a launch agent
-or an availability promise, and stopping it does not stop WireGuard by itself.
-Always run the explicit `wg-quick down` command before ending supervision.
+Authorized leaves render `AllowedIPs = 0.0.0.0/0, ::/0` plus those DNS servers.
+Other leaves keep their host-only route. The hub keeps one leaf `/32` per peer.
+Manifests mark forwarding, NAT, and fail-closed egress as requirements while
+explicitly reporting that none was activated.
 
-Do not proceed if `wg-quick` would add anything broader than the declared
-temporary `/32` routes. This is WireGuard-over-private-underlay, not a
-replacement for either layer. Before activation, verify the outer path from
-the leaf using Nord's peer-online state and an approved reachable service (or
-ICMP where allowed) at the laptop's Meshnet address. Do not infer reachability
-from the laptop being able to see itself in the mesh application. WireGuard's
-UDP listener does not exist until the hub is up and does not answer arbitrary
-UDP probes; prove the inner path only afterward with an authenticated leaf
-handshake and increasing counters.
+macOS cannot be selected as this egress gateway. The current repository does
+not implement selective PF routing, a macOS Nord namespace, or a safe way to
+keep direct WireGuard outer packets off the Nord egress path.
 
-### Mode B (deferred): WireGuard.app with a direct LAN or public endpoint
+The image contract under `../containers/nord-egress/` is for native Linux or
+rootful Linux Podman. Its separate ignored declaration carries exact
+`authorized_source_addresses`, one `/32` for each mesh node named in
+`egress.authorized_leaf_ids`. It must never authorize the containing recovery
+subnet. The hub retains one peer `/32` per leaf as WireGuard’s cryptokey-routing
+anti-spoof boundary.
 
-Disconnect Nord first, then use the official WireGuard app linked from the
-[WireGuard installation page](https://www.wireguard.com/install/). This mode
-requires a separately reviewed standard WireGuard `.conf` with a direct LAN or
-public endpoint. The current renderer intentionally refuses such an endpoint,
-and the existing WireGuard.app tunnel must remain untouched.
+`scripts/render_nord_egress_container.py` validates that credential-free
+declaration only when it is bound to the authoritative mesh through
+`--mesh-config`. The binding fixes the generation, cutover epoch, expiry,
+normalized-document SHA-256, Linux gateway address and public key, WireGuard
+interface, mesh-provided public DNS, authorized leaf IDs, and exact source
+`/32`s. It also binds every leaf's WireGuard public key to its exact `/32` for
+runtime verification. The duplicated generation, subnet, interface, and source
+list must agree, while peer transit must remain false.
 
-Use public forwarding only when no private underlay is available. If the
-laptop sits behind both an ISP gateway and a local router, reserve the laptop's
-LAN address and forward the same UDP port at both layers:
+The owner-only ignored output now includes 15 artifacts: three Quadlets; host-
+guard and route-lifecycle scripts/services; a `wg-quick` dependency drop-in;
+an expiry-stop service and persistent timer; `mesh-binding.json`; a staged
+`Containerfile`, entrypoint, and C token helper; and a manifest. Its install map
+uses only future root-owned paths under
+`/etc/containers/systemd`, `/etc/systemd/system`, and
+`/etc/short-circuit/nord-egress/`; root units never refer to the user-writable
+clone. The Quadlets reference a separately created rootful Podman secret, have
+no `[Install]` section, and are not copied into systemd’s search path by the
+renderer.
 
-```text
-public UDP 51821
-  -> ISP gateway:51821
-  -> local router:51821
-  -> laptop LAN address:51821
-```
+If later installed on Linux, the container logs into Nord from that mounted
+secret, selects NordLynx, enables Nord’s kill switch, admits only the declared
+leaf `/32`s, NATs them only through `nordlynx`, and disables/drops IPv6. The
+NordVPN 5.2.0 `.deb` is content-pinned against fixed amd64/arm64 SHA-256
+values. The built C broker starts the pinned CLI's no-positional-token flow in
+a PTY, waits for the exact prompt and disabled echo, and only then disables
+dumps, reads/forwards/wipes the root-owned secret, and suppresses child output.
+No token enters process arguments or the environment. If NordLynx disappears,
+the forwarding policy remains default-deny
+rather than falling back to the ordinary container bridge.
 
-Use a stable public DNS name if available. A carrier-grade NAT or an upstream
-network outside your control may make inbound forwarding impossible; switch to
-a reachable private underlay or a deliberately managed relay instead of
-opening unrelated ports. Forward only WireGuard's UDP listener—never publish
-SMB, SSH, HTTPS, SFTP, Podman, or database ports as a workaround.
+The rendered host guard preserves the same `/32` authorization at the native-
+Linux boundary. It is ordered before `wg-quick` and the container, installs a
+terminal IPv4 route plus interface-wide IPv4/IPv6 prohibit rules and nftables
+isolation, and persists when the container stops. The policy-rule terminal
+denials survive an nftables flush. The preferred route service is
+`BindsTo`/`After` both the healthy container and systemd `wg-quick` unit. The
+fixed `wg-quick` drop-in requires/verifies the guard, wants that route service,
+and verifies the gateway public key, listen port, exact IPv4/no-global-IPv6
+identity, and complete public-key→exact-`/32` peer map after interface startup.
+Failed starts force `wg-quick down` through `ExecStopPost`. Hard preflight also
+requires rootful Podman 5.8+, `/dev/net/tun`, host IPv4 forwarding, and
+non-strict `rp_filter`.
 
-## Build and Render the macOS Tunnel
+Raw `wg-quick up`, `wg setconf`, and live peer mutation bypass the dependency
+drop-in and are unsupported for this Linux egress path. Safe generation
+cutover uses only systemd activation, atomically replaces the fixed managed
+drop-in, and masks/stops the old WireGuard and generation services before
+explicitly decommissioning the old guard. The cleanup action refuses to remove
+terminal protection while the WireGuard unit can restart, its interface still
+exists, or a preferred route remains.
 
-The repository renderer produces a narrow, host-only WireGuard config for the
-private-underlay command-line path only. Linux `wg-quick@` systemd and
-firewalld steps in the normal server installer do not apply to this temporary
-macOS phase.
+On that Linux path, the mesh expiry is active policy. Guard startup and
+verification fail when the bound UTC deadline has passed. The managed drop-in
+hard-requires and orders itself after a persistent timer that is
+`BindsTo`/`PartOf` the systemd WireGuard unit without reverse ordering. At
+`expires_at`, its dedicated stop service stops WireGuard, which removes the
+bound preferred route while leaving the terminal guard intact. This timer does
+not change the temporary Mac procedure: the Mac remains manually supervised and
+host-only.
 
-1. Initialize the ignored generation-zero declaration. This refuses to
-   overwrite an existing local declaration and does not activate anything.
+This namespace does not host WireGuard, join Meshnet, or hold application
+leadership. None of `render_wireguard_mesh.py`,
+`render_nord_egress_container.py`, or `setup_wireguard.sh` installs an
+artifact, creates or exposes a token, logs into Nord, starts the egress path, or
+tests live traffic.
+
+The host guard is also not a persistent leaf-side kill switch. If an authorized
+leaf tears down its WireGuard interface, its ordinary WAN route can return.
+End-to-end no-fallback therefore remains a native-Linux gateway and leaf
+integration gate even after the artifacts have rendered successfully.
+
+## Build and Render the Mac Tunnel
+
+1. Initialize the ignored generation-zero declaration. Initialization refuses
+   to overwrite an existing file and activates nothing.
 
    ```bash
    python3 scripts/render_wireguard_mesh.py init
    ```
 
-2. Generate the laptop's fresh key pair. The defaults are
-   `config/wireguard/mesh.local.d/keys/temp-mac-hub.key` (secret, mode `0600`)
-   and its `.pub` companion.
+2. Generate the laptop’s fresh key pair. The default files are owner-only
+   under `config/wireguard/mesh.local.d/keys/`.
 
    ```bash
    python3 scripts/render_wireguard_mesh.py generate-key \
      --node-id temp-mac-hub
    ```
 
-   Generate each leaf key on the device that owns it and exchange only the
-   `.pub` value. Do not centralize every node's private key on the laptop.
+   Generate each leaf key on the owning device and exchange only its `.pub`
+   value. Do not centralize leaf private keys on the laptop.
 
-3. Edit `config/wireguard/mesh.local.json`: advance `generation` and
-   `cutover_epoch`, set a UTC expiry no more than 31 days ahead, add
-   `temp-mac-hub` at
-   `10.99.0.254/32`, and add approved leaves beginning at `10.99.0.241/32`.
-   Put the laptop's literal private mesh address and port in its
-   `underlay_endpoint`. The declaration contains no private keys.
+3. Edit `config/wireguard/mesh.local.json`. Advance generation and cutover
+   epoch, set the expiry, add the Mac hub, and add leaves with the selected
+   per-leaf transport. Keep peer transit false and egress disabled.
 
-4. Validate the declaration, then render only the local laptop node:
+4. Validate, then render only the local node:
 
    ```bash
    python3 scripts/render_wireguard_mesh.py validate
    python3 scripts/render_wireguard_mesh.py render --node-id temp-mac-hub
    ```
 
-5. Find the artifacts under
-   `config/wireguard/mesh.local.d/rendered/generation-<N>/temp-mac-hub/`. The
-   renderer writes `temp-mac-hub.conf` mode `0600` plus a key-free local
-   `manifest.json`; neither file is committed. Render a leaf only on the system
-   that holds that leaf's private key. A changed key or declaration advances
-   both generation and cutover epoch and renders into a new generation
-   directory; never overwrite the prior artifact in place. After the new
-   handshake succeeds, revoke the old public key and remove its private
-   artifact through the approved secret-removal process.
+5. Review the generation-scoped artifacts under
+   `config/wireguard/mesh.local.d/rendered/`. The `.conf` is mode `0600` and
+   contains the private key. The adjacent local manifest is key-free but still
+   private topology metadata.
 
-6. Review the generated configuration before activation: no canonical server
-   private key, no default route, no LAN route, no peer-pool route, and no
-   `PostUp`, `PostDown`, forwarding, or NAT hooks. Do not paste the config into
-   a terminal log because its `PrivateKey` is usable secret material.
+6. Confirm the config contains no canonical-server key, default route, LAN
+   route, peer-pool route, `PostUp`, or `PostDown`. Its manifest must report
+   activation, routing, forwarding, and NAT as false.
 
-7. Activate with supervised Mode A only. macOS sleep, network changes, or tool
-   exit can remove availability; this is not a 24/7 service promise.
+7. Activate only during the supervised session:
 
-If Mode B is reviewed and implemented later, WireGuard.app's import/export
-controls may be used for its private `.conf` handoff. An imported or exported
-configuration contains private key material: transfer it through an approved
-encrypted channel, import it only on the intended device, then remove the
-handoff copy and empty the Trash. Never commit it or attach it to an issue,
-chat, or CI artifact. Preserve the existing canonical app tunnel; do not edit
-it in place to create the temporary identity.
+   ```bash
+   sudo wg-quick up /absolute/protected/path/temp-mac-hub.conf
+   sudo wg show
+   caffeinate -s -i
+   # Press Ctrl-C to release the sleep assertion, then stop the tunnel:
+   sudo wg-quick down /absolute/protected/path/temp-mac-hub.conf
+   ```
+
+Keep the laptop on AC power. Stopping `caffeinate` does not stop WireGuard; run
+the explicit `wg-quick down` command before ending supervision.
+
+### Legacy schema-v1 declarations
+
+The CLI continues to read schema v1. It validates the old document first,
+maps RFC6598 endpoints to `nord-meshnet` and other accepted private endpoints
+to `direct`, supplies conservative platform labels, disables transit and
+egress, and normalizes to schema v2 in memory. It prints a warning and never
+rewrites the source.
+
+Migrate the private file deliberately. Advance generation and cutover epoch so
+new output goes to a new reviewed directory; do not overwrite generation-one
+artifacts. A schema migration alone does not require key rotation, though any
+provisional or improperly shared key still must be replaced.
 
 ## Validate from Outside
 
-Validate from a second device on a genuinely different network. For current
-Mode A, ensure the client is reaching the laptop's Nord Meshnet address rather
-than a local LAN address. If Mode B is reviewed later, turn off the client's
-home Wi-Fi and use cellular or another external network to test its public
+Use a second device on a genuinely different network.
+
+1. Prove the selected outer path first: the direct LAN/public path, provisioned
+   opaque relay plus Air-side outbound client, or authorized Nord Meshnet
+   address.
+2. Bring up the supervised hub and leaf. Confirm a recent authenticated
+   handshake and increasing counters at both ends.
+3. Reach `10.99.0.254`. Test an application port only when that service is
+   intentionally bound and protected on the laptop.
+4. Confirm `10.99.0.1`, every other temporary leaf, the home LAN, and Internet
+   defaults are not routed to this host-only tunnel.
+5. Disable and re-enable the leaf once to test a new NAT mapping. Record the
+   network, transport mode, endpoint, handshake time, and outcome without
+   recording private keys.
+
+A UDP listener does not answer an arbitrary probe, and a rendered profile is
+not reachability evidence. The authenticated handshake is the first valid
+WireGuard path test.
+
+Run the separate roaming-policy audit before claiming that the temporary hub is
+usable away from the trusted WLAN. A successful local handshake proves only
+the `lan-direct` class. Guest isolation, other Wi-Fi, and cellular remain
+uncovered until a public/direct or opaque relay endpoint passes authenticated
+handshake tests using the same imported iPhone profile. “All networks” here
+means Internet paths that allow outbound UDP to the selected endpoint; it does
+not include captive/no-Internet or all-UDP-blocked networks. NordVPN must remain
+outside this carrier decision.
+Keep any public listener or relay default-deny with only its reviewed
+WireGuard UDP port exposed; protect relay management on a separate restricted
 path.
-
-1. Bring up the supervised laptop hub, then activate the remote profile and
-   confirm a recent authenticated handshake plus increasing receive/transmit
-   counters at both ends. This is the first valid UDP listener test.
-2. Reach `10.99.0.254` from the remote device. Test an application port only if
-   that service is intentionally bound and protected on the laptop; a
-   successful WireGuard handshake does not prove an application is listening.
-3. Inspect the remote routing table and confirm `10.99.0.1`, every other
-   temporary peer `/32`, and home-LAN addresses are not routed to this tunnel.
-   Connection attempts must not cross the tunnel either. Those negative checks
-   prove the host-only fence remains intact.
-4. Disable and re-enable the client once to prove the endpoint survives a new
-   NAT mapping. Record the observed external network, endpoint, handshake time,
-   and result without recording private keys.
-
-WireGuard's own
-[quick-start guidance](https://www.wireguard.com/quickstart/) explains key
-generation, peer `AllowedIPs`, endpoints, and persistent keepalives. Endpoint
-reachability and application authorization still require separate tests.
 
 ## Expiry, Fencing, and Handback
 
-Do not turn recovery into automatic failover. When the home server is ready:
+When the home server is ready:
 
-1. Announce the handback and stop application writes through the temporary
-   path. Let the application's normal transaction/lease mechanism fence its
-   writer; tunnel state is not a writer election.
-2. Deactivate `temp-mac-hub` on the laptop—`wg-quick down` in
-   Mode A or Deactivate in WireGuard.app in Mode B. Confirm its transfer
-   counters stop and no temporary peer reports a fresh handshake.
-3. Remove both public UDP forwarding rules, or the temporary private-underlay
-   allowance, before enabling the canonical listener.
-4. Bring up the canonical home-server tunnel on its original identity and
-   `10.99.0.1`. Activate canonical client profiles one at a time and validate
-   their external handshakes and required services.
-5. Re-enable application writes only after the canonical coordinator has
-   passed its own quorum, storage, and writer-fencing checks.
-6. Revoke/delete every temporary peer and laptop private key, remove private
-   exports, mark the declaration expired, and retain only a key-free audit
-   record.
+1. Announce handback and stop application writes through the temporary path.
+   Let the application’s transaction/lease mechanism fence its writer.
+2. Run `wg-quick down` on the Mac. Confirm transfer counters stop and no leaf
+   reports a fresh handshake.
+3. Remove temporary public UDP forwards or Meshnet access allowances.
+4. Restore the canonical home-server identity at `10.99.0.1` and validate its
+   external handshakes and required services one client at a time.
+5. Re-enable application writes only after the canonical coordinator passes
+   its own quorum, storage, and writer-fencing checks.
+6. Revoke temporary peers, remove their private artifacts through the approved
+   secret-removal process, expire the declaration, and retain only a key-free
+   audit record.
 
-If the expiry arrives before the server is ready, deactivate and reassess; do
-not silently extend the epoch or reuse the identity in a new temporary period.
+If expiry arrives first, deactivate and reassess. Do not silently extend the
+epoch or reuse the temporary identity.
 
-## When a Routed Hub Is Actually Required
+## References
 
-Use a native Linux host or a dedicated Linux VM with a stable network attachment
-for routed access, peer-to-peer forwarding, home-LAN reachability, or unattended
-operation. That design needs explicit IP forwarding, firewall zones/rules,
-return routes or narrowly scoped NAT, monitoring, and a reviewed activation
-path. It is a separate `wireguard-lan-vpn` deployment—not a flag to add to this
-macOS host-only tunnel.
-
-Apple documents VPN deployment as a managed network service in its
-[VPN overview](https://support.apple.com/guide/deployment/vpn-overview-depae3d361d0/web).
-The official WireGuard Apple client is implemented through Apple's networking
-facilities; its source and platform notes are available in the
-[WireGuard Apple repository](https://git.zx2c4.com/wireguard-apple/about/).
+- WireGuard installation: <https://www.wireguard.com/install/>
+- WireGuard quick start: <https://www.wireguard.com/quickstart/>
+- Apple `NETunnelProviderManager`:
+  <https://developer.apple.com/documentation/networkextension/netunnelprovidermanager>
+- Nord Meshnet remote-access permissions:
+  <https://meshnet.nordvpn.com/features/explaining-permissions/remote-access-permissions>
+- Local egress-container contract:
+  [`../containers/nord-egress/README.md`](../containers/nord-egress/README.md)
