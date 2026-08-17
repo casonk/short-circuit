@@ -10,18 +10,18 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "scripts/install_failure_notifier.sh",
   "SymlinkFile": "",
-  "Commit": "19f45a3bef23d7834d3f698813a7a375cd3e4e96",
-  "Link": "https://github.com/casonk/short-circuit/blob/19f45a3bef23d7834d3f698813a7a375cd3e4e96/scripts/install_failure_notifier.sh#L23",
+  "Commit": "1c4d156092238d79cd6fbd44b8c152d4f1b86f3d",
+  "Link": "https://github.com/casonk/short-circuit/blob/1c4d156092238d79cd6fbd44b8c152d4f1b86f3d/scripts/install_failure_notifier.sh#L23",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
   "Date": "2026-06-18T11:52:38Z",
-  "Message": "fix: correct heredoc indentation in install_failure_notifier.sh\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
+  "Message": "fix: correct heredoc indentation in install_failure_notifier.sh",
   "Tags": [
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "19f45a3bef23d7834d3f698813a7a375cd3e4e96:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:23"
+  "Fingerprint": "1c4d156092238d79cd6fbd44b8c152d4f1b86f3d:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:23"
  },
  {
   "RuleID": "portfolio-git-workspace-path",
@@ -34,18 +34,18 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "config/service-failure-notify",
   "SymlinkFile": "",
-  "Commit": "47cd91d029cdd25f969a0ed883495454eef3068b",
-  "Link": "https://github.com/casonk/short-circuit/blob/47cd91d029cdd25f969a0ed883495454eef3068b/config/service-failure-notify#L7",
+  "Commit": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc",
+  "Link": "https://github.com/casonk/short-circuit/blob/95f9130b7b3dfaa73e36da197a9b737e5984e6dc/config/service-failure-notify#L7",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
   "Date": "2026-06-14T01:28:08Z",
-  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
+  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf",
   "Tags": [
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "47cd91d029cdd25f969a0ed883495454eef3068b:config/service-failure-notify:portfolio-git-workspace-path:7"
+  "Fingerprint": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc:config/service-failure-notify:portfolio-git-workspace-path:7"
  },
  {
   "RuleID": "portfolio-git-workspace-path",
@@ -58,17 +58,17 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "scripts/install_failure_notifier.sh",
   "SymlinkFile": "",
-  "Commit": "47cd91d029cdd25f969a0ed883495454eef3068b",
-  "Link": "https://github.com/casonk/short-circuit/blob/47cd91d029cdd25f969a0ed883495454eef3068b/scripts/install_failure_notifier.sh#L26",
+  "Commit": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc",
+  "Link": "https://github.com/casonk/short-circuit/blob/95f9130b7b3dfaa73e36da197a9b737e5984e6dc/scripts/install_failure_notifier.sh#L26",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
   "Date": "2026-06-14T01:28:08Z",
-  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf\n\nCo-Authored-By: Claude Sonnet 4.6 \u003cnoreply@anthropic.com\u003e",
+  "Message": "fix(dnsmasq): use bind-dynamic and add OnFailure email notifier\n\nbind-interfaces conflicts with bind-dynamic when both short-circuit\nand pit-box dnsmasq configs are installed together. Switching to\nbind-dynamic is the correct setting for a WireGuard interface that\ncomes up after dnsmasq starts.\n\nAdds dnsmasq --test validation after writing the DNS config so\nconflicts are caught at install time rather than silently at next boot.\n\nAdds scripts/install_failure_notifier.sh which installs:\n- /usr/local/bin/service-failure-notify (shock-relay email notifier)\n- /etc/systemd/system/service-failure-notify@.service (template unit)\n- /etc/systemd/system/dnsmasq.service.d/on-failure-notify.conf",
   "Tags": [
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "47cd91d029cdd25f969a0ed883495454eef3068b:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:26"
+  "Fingerprint": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:26"
  }
 ]
