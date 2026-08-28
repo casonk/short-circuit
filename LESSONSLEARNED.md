@@ -204,3 +204,13 @@
 - Define “works across networks” honestly: it covers Internet paths that permit
   outbound UDP to the selected endpoint, not captive portals before login,
   offline networks, or networks that block every usable outbound UDP port.
+
+### 2026-08-27 — One mobile tunnel can use disjoint service peers without transit
+
+- A replacement iOS profile can contain one temporary-mesh peer and one or
+  more canonical service peers when every `AllowedIPs` entry is that peer's
+  exact `/32`. Do not substitute the temporary mesh subnet, peer transit, a
+  default route, or an application-writer choice for explicit service peers.
+- Bind the temporary peer, client identity, generation, and expiry exactly to
+  the active mesh declaration. Canonical peers must stay outside the temporary
+  mesh subnet and remain independently reviewed endpoints.
