@@ -63,6 +63,18 @@ package "Roaming coverage policy (render only)" {
   RoamingRenderer --> RoamingPlan
 }
 
+package "Multi-service mobile access (render only)" {
+  [access-bundle.local.json\nowner-only] as AccessBundle
+  [render_wireguard_access_bundle.py\n--mesh-config required] as AccessRenderer
+  [replacement iOS profile\ntemporary + canonical exact /32 peers] as AccessProfile
+  [key-free access manifest\nno transit / default route / writer] as AccessManifest
+
+  AccessBundle --> AccessRenderer
+  MeshBinding --> AccessRenderer : exact leaf + temporary hub\ngeneration + expiry binding
+  AccessRenderer --> AccessProfile
+  AccessRenderer --> AccessManifest
+}
+
 package "Outbound-only NordVPN egress (Linux/rootful Podman)" {
   [egress config\nowner-only] as EgressConfig
   [render_nord_egress_container.py\n--mesh-config required] as EgressRenderer
@@ -119,6 +131,11 @@ end note
 note bottom of MeshBinding
   peer_transit and nord-vpn are mutually exclusive.
   Public DNS belongs to the canonical mesh binding.
+end note
+
+note bottom of AccessRenderer
+  One temporary mesh peer plus canonical service peers.
+  Exact disjoint /32 routes; import stays explicit.
 end note
 
 note bottom of EgressRenderer

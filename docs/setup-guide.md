@@ -254,6 +254,34 @@ the hub manifest as requiring forwarding, but does not enable that forwarding.
 schema; the egress boundary deliberately accepts named leaf `/32`s rather than
 a transit-capable overlay.
 
+### Build a multi-service mobile access bundle
+
+When a phone must reach both the temporary Air hub and a canonical home server,
+render one replacement profile rather than enabling peer transit or treating a
+reachable service as an application-writer failover decision. The owner-only
+bundle declaration binds its client identity and temporary Air peer exactly to
+the active mesh declaration. It then adds one or more canonical peers, each on
+its own non-overlapping `/32` outside the temporary mesh subnet.
+
+```bash
+python3 scripts/render_wireguard_access_bundle.py init
+# Fill config/wireguard/access-bundle.local.json from the active mesh and
+# canonical server's reviewed public key, /32, and endpoint.
+python3 scripts/render_wireguard_access_bundle.py validate \
+  --mesh-config config/wireguard/mesh.local.json
+python3 scripts/render_wireguard_access_bundle.py render \
+  --mesh-config config/wireguard/mesh.local.json \
+  --private-key-file config/wireguard/mesh.local.d/keys/mini.key
+```
+
+The bundle expires with the temporary mesh and refuses to render if its client,
+Air peer, endpoint, generation, or expiry differs from that declaration. It
+contains only exact peer `/32` `AllowedIPs`; it never renders a recovery subnet,
+default route, forwarding rule, or application writer selection. Importing the
+replacement iOS profile and adding the same client public key to every server
+remain explicit operator actions. By default, each output is created once under
+an owner-only generation/client directory, preserving the reviewed prior bundle.
+
 ### Classify roaming networks before activation
 
 A private `direct` endpoint is not automatically usable from an isolated guest
