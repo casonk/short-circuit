@@ -18,9 +18,6 @@ Mark items `[x]` when complete and move them to Done.
   default-deny ingress exposes only the reviewed WireGuard UDP port, keeps
   relay management on a separately protected path, and states the required
   Internet/outbound-UDP boundary explicitly.
-- [ ] [manual:2026-08-09] Add the multi-service-peer access-bundle renderer so
-  canonical and temporary service hosts can coexist as disjoint `/32` peers in
-  one iOS tunnel without treating reachability as application-writer failover.
 - [ ] [manual:2026-08-09] Publish the roaming plan's JSON/Markdown pair with an
   atomic generation-directory commit and safe orphan-staging recovery. Current
   rollback handles ordinary write failures but not a power loss between files.
@@ -35,3 +32,9 @@ Mark items `[x]` when complete and move them to Done.
 ## In Progress
 
 ## Done
+
+- [x] [manual:2026-08-27] Added the multi-service-peer access-bundle renderer.
+  It binds the current client and one temporary peer to the active mesh, then
+  renders one replacement iOS profile with one or more canonical peers on
+  disjoint exact `/32` routes. It never enables transit, a default route, or
+  application-writer selection.

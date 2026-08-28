@@ -60,6 +60,11 @@ Declarative recovery topology (separate render-only path)
     stable-primary      -> one path must cover trusted/isolated/off-site
     Nord role           -> egress-only; never a roaming carrier
 
+  access-bundle.example.json -> ignored access-bundle.local.json
+    + active mesh declaration + existing leaf private key
+      -> render_wireguard_access_bundle.py
+      -> replacement iOS profile with one temporary hub and canonical exact-/32 peers
+
   No render path activates an interface, route, firewall, forwarding, NAT,
   systemd, Podman, Nord login, failover, or application writer leadership.
   The authorized leaf still needs a persistent local no-fallback policy.

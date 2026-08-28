@@ -40,6 +40,9 @@ This repo lives under:
   renderer with schema-v1 in-memory compatibility
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
+- `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
+  profile with an existing temporary-mesh peer plus disjoint canonical service
+  peers; it never enables transit or selects an application writer
 - `scripts/render_nord_egress_container.py`: owner-only, mesh-bound renderer for
   15 inactive rootful-Linux artifacts: three Quadlets, guard/route/expiry
   lifecycle, managed `wg-quick` dependency, binding, build inputs, and manifest
@@ -50,6 +53,8 @@ This repo lives under:
 - `config/wireguard/mesh.example.json`: synthetic temporary-mesh declaration
 - `config/wireguard/roaming-policy.example.json`: inert roaming-policy
   declaration with Nord restricted to outbound egress
+- `config/wireguard/access-bundle.example.json`: inert multi-service mobile
+  access-bundle declaration
 - `config/wireguard/nord-egress-container.example.json`: inert, credential-free
   rootful-Podman egress declaration
 - `containers/nord-egress/`: isolated Linux NordLynx egress image contract;
