@@ -199,3 +199,13 @@
 - If a prior timer fires early against newer metadata, it can report “pending”
   and exit without providing the intended deadline rollback, so the scheduling
   identity must bind to the rollout generation.
+
+### 2026-09-02 — Confirm router forwarding against the current LAN address
+
+- When a coherent WireGuard server/client config still produces no handshake
+  from cellular, verify that the router forwards the public UDP port to the
+  host's current LAN address. DHCP drift from one LAN address to another can
+  silently leave the listener healthy but unreachable from outside.
+- Use `tcpdump` on the WAN-facing interface while toggling a cellular client:
+  packets arriving means debug keys/runtime WireGuard state; no packets means
+  debug router forwarding, NAT, ISP, or upstream path first.
