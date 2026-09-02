@@ -99,6 +99,41 @@ metadata_path() {
   printf '%s/rollout.env\n' "$(state_dir)"
 }
 
+metadata_status() {
+  local metadata
+  local owner
+  local mode
+
+  metadata="$(metadata_path)"
+  [[ -f "${metadata}" ]] || return 1
+  owner="$(stat -c '%u' "${metadata}")"
+  mode="$(stat -c '%a' "${metadata}")"
+  if [[ "${owner}" != "0" ]]; then
+    [[ "${SHORT_CIRCUIT_TEST_ALLOW_USER_STATE:-0}" == "1" ]] ||
+      fail "metadata must be owned by root: ${metadata}"
+  fi
+  (( (8#${mode} & 8#022) == 0 )) || fail "metadata must not be group- or world-writable"
+  bash -c 'source "$1"; printf "%s" "${STATUS:-pending}"' bash "${metadata}"
+}
+
+archive_rollout_state() {
+  local archive_dir
+  local item
+  local stamp
+  local status
+
+  status="$(metadata_status)"
+  stamp="$(date +%Y%m%dT%H%M%S)"
+  archive_dir="$(state_dir)/archive/${stamp}-${status}"
+  install -d -m 0700 "${archive_dir}"
+  for item in rollout.env previous.conf candidate.conf; do
+    if [[ -e "$(state_dir)/${item}" ]]; then
+      mv -f "$(state_dir)/${item}" "${archive_dir}/${item}"
+    fi
+  done
+  log "archived prior ${status} rollout state: ${archive_dir}"
+}
+
 previous_config_path() {
   printf '%s/previous.conf\n' "$(state_dir)"
 }
@@ -132,6 +167,7 @@ extract_candidate_peers() {
 
 join_peers_for_state() {
   local peer
+  local existing_status
   local joined=""
 
   for peer in "${REQUIRED_PEERS[@]}"; do
@@ -315,7 +351,11 @@ apply_rollout() {
   state="$(state_dir)"
   install -d -m 0700 "${state}"
   if [[ -f "$(metadata_path)" ]]; then
-    fail "pending rollout already exists for ${INTERFACE}; verify or roll it back first"
+    existing_status="$(metadata_status)"
+    if [[ "${existing_status}" == "pending" ]]; then
+      fail "pending rollout already exists for ${INTERFACE}; verify or roll it back first"
+    fi
+    archive_rollout_state
   fi
   cp -p "${CONFIG_PATH}" "$(previous_config_path)"
   cp -p "${CANDIDATE_PATH}" "$(candidate_config_path)"

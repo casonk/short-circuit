@@ -133,7 +133,8 @@ sudo ./scripts/guarded_wireguard_rollout.sh \
 selected peer has a fresh handshake after the apply time, `--verify-or-rollback`
 restores the prior config and restarts WireGuard. Pass `--required-peer
 <public-key>` to monitor a specific device; otherwise the guard derives peers
-from the candidate config and accepts any one fresh handshake.
+from the candidate config and accepts any one fresh handshake. After rollback or
+success, the next apply archives the old state automatically.
 
 ### Export a Desktop Client Config
 
