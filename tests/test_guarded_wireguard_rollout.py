@@ -119,8 +119,11 @@ def test_apply_extracts_candidate_peers_and_arms_systemd_guard(tmp_path: Path) -
     metadata = (state_root / "wg0" / "rollout.env").read_text(encoding="utf-8")
     assert PEER_A in metadata
     assert "TIMEOUT_SECONDS=1800" in metadata
-    assert "systemctl restart wg-quick@wg0.service" in log.read_text(encoding="utf-8")
-    assert "--on-active=1800s" in log.read_text(encoding="utf-8")
+    command_log = log.read_text(encoding="utf-8")
+    assert "systemctl restart wg-quick@wg0.service" in command_log
+    assert "--on-active=1800s" in command_log
+    assert "--unit=short-circuit-wg0-rollback-guard-" in command_log
+    assert "--unit=short-circuit-wg0-rollback-guard " not in command_log
 
 
 def test_apply_restores_previous_config_when_restart_fails(tmp_path: Path) -> None:
@@ -258,6 +261,30 @@ printf 'systemd-run %s\n' "$*" >> {log}
     assert "archived prior rolled-back rollout state" in result.stdout
     assert list((state_dir / "archive").glob("*-rolled-back/rollout.env"))
     assert PEER_B in (state_dir / "rollout.env").read_text(encoding="utf-8")
+
+
+def test_arm_guard_schedules_existing_pending_rollout(tmp_path: Path) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    log = tmp_path / "commands.log"
+    state_root = tmp_path / "state"
+    _metadata(state_root, apply_epoch=9999999999, timeout=1800, peers=PEER_A)
+    _write_fake_bin(fake_bin, "wg", "#!/usr/bin/env bash\nexit 0\n")
+    _write_fake_bin(
+        fake_bin,
+        "systemd-run",
+        f"""#!/usr/bin/env bash
+printf 'systemd-run %s\n' "$*" >> {log}
+""",
+    )
+
+    result = _run(tmp_path, ["--arm-guard", "--state-root", str(state_root)], env=_env(fake_bin))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    command_log = log.read_text(encoding="utf-8")
+    assert "--unit=short-circuit-wg0-rollback-guard-9999999999" in command_log
+    assert "--verify-or-rollback --interface wg0" in command_log
+    assert "armed rollback guard" in result.stdout
 
 
 def test_verify_marks_success_after_fresh_required_handshake(tmp_path: Path) -> None:

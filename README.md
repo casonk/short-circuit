@@ -134,7 +134,11 @@ selected peer has a fresh handshake after the apply time, `--verify-or-rollback`
 restores the prior config and restarts WireGuard. Pass `--required-peer
 <public-key>` to monitor a specific device; otherwise the guard derives peers
 from the candidate config and accepts any one fresh handshake. After rollback or
-success, the next apply archives the old state automatically.
+success, the next apply archives the old state automatically. Each scheduled
+rollback guard uses the apply timestamp in its transient systemd unit name so a
+prior timer cannot block a corrected rollout. If a config was applied but guard
+scheduling failed, run `--arm-guard` to schedule verification from the saved
+pending metadata.
 
 ### Export a Desktop Client Config
 

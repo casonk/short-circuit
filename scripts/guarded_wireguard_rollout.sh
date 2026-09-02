@@ -27,6 +27,7 @@ Modes:
   --apply                 Snapshot current config, apply candidate, and arm guard.
   --verify                Check whether the pending rollout has succeeded.
   --verify-or-rollback    Check the pending rollout and roll back on timeout.
+  --arm-guard             Schedule rollback guard for an existing pending rollout.
   --rollback              Restore the prior config immediately.
   --status                Report pending rollout status (default).
 
@@ -144,7 +145,9 @@ candidate_config_path() {
 
 unit_name() {
   local safe="${INTERFACE//[^A-Za-z0-9_.-]/_}"
-  printf 'short-circuit-%s-rollback-guard\n' "${safe}"
+  local epoch="${APPLY_EPOCH:-pending}"
+
+  printf 'short-circuit-%s-rollback-guard-%s\n' "${safe}" "${epoch}"
 }
 
 script_path() {
@@ -167,7 +170,6 @@ extract_candidate_peers() {
 
 join_peers_for_state() {
   local peer
-  local existing_status
   local joined=""
 
   for peer in "${REQUIRED_PEERS[@]}"; do
@@ -298,6 +300,18 @@ deadline_reached() {
   (( 10#${now} >= 10#${APPLY_EPOCH} + 10#${TIMEOUT_SECONDS} ))
 }
 
+remaining_timeout_seconds() {
+  local now
+  local remaining
+
+  now="$(date +%s)"
+  remaining=$((10#${APPLY_EPOCH} + 10#${TIMEOUT_SECONDS} - 10#${now}))
+  if (( remaining < 1 )); then
+    remaining=1
+  fi
+  printf '%s\n' "${remaining}"
+}
+
 restart_wireguard() {
   systemctl restart "wg-quick@${INTERFACE}.service"
 }
@@ -308,25 +322,28 @@ restore_previous_config() {
 }
 
 schedule_systemd_guard() {
+  local delay_seconds
   local unit
 
   require_command systemd-run
+  delay_seconds="$(remaining_timeout_seconds)"
   unit="$(unit_name)"
   systemd-run \
     --unit="${unit}" \
-    --description="short-circuit WireGuard rollback guard for ${INTERFACE}" \
-    --on-active="${TIMEOUT_SECONDS}s" \
+    --description="short-circuit WireGuard rollback guard for ${INTERFACE} applied at ${APPLY_EPOCH}" \
+    --on-active="${delay_seconds}s" \
     --collect \
     /usr/bin/env bash "$(script_path)" \
       --verify-or-rollback \
       --interface "${INTERFACE}" \
       --state-root "${STATE_ROOT}" >/dev/null
-  log "armed rollback guard: ${unit} in ${TIMEOUT_SECONDS}s"
+  log "armed rollback guard: ${unit} in ${delay_seconds}s"
 }
 
 apply_rollout() {
   local state
   local peer
+  local existing_status
 
   require_root
   require_command install
@@ -396,6 +413,14 @@ verify_rollout() {
   fi
   log "rollout still pending: no fresh required peer handshake yet"
   return 1
+}
+
+arm_existing_guard() {
+  require_root
+  require_command systemd-run
+  load_metadata
+  [[ "${STATUS}" == "pending" ]] || fail "rollout status is ${STATUS}; only pending rollouts can arm a guard"
+  schedule_systemd_guard
 }
 
 rollback_rollout() {
@@ -469,6 +494,7 @@ while [[ $# -gt 0 ]]; do
     --apply) MODE="apply"; shift ;;
     --verify) MODE="verify"; shift ;;
     --verify-or-rollback) MODE="verify-or-rollback"; shift ;;
+    --arm-guard) MODE="arm-guard"; shift ;;
     --rollback) MODE="rollback"; shift ;;
     --status) MODE="status"; shift ;;
     --candidate) require_option_value "$1" "${2:-}"; CANDIDATE_PATH="$2"; shift 2 ;;
@@ -497,6 +523,7 @@ case "${MODE}" in
   apply) apply_rollout ;;
   verify) verify_rollout ;;
   verify-or-rollback) verify_or_rollback ;;
+  arm-guard) arm_existing_guard ;;
   rollback) rollback_rollout ;;
   status) status_rollout ;;
   *) fail "unsupported mode: ${MODE}" ;;

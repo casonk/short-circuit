@@ -190,3 +190,12 @@
 - Judge success by a fresh peer handshake newer than the apply
   timestamp, not by `wg-quick` being active alone. If the deadline expires
   first, restore the prior config and restart WireGuard automatically.
+
+### 2026-09-02 — Rollback guard units need per-rollout identity
+
+- A systemd transient rollback guard should include the apply epoch or another
+  rollout identifier in its unit name. A stable per-interface unit name can
+  remain loaded after rollback and block the next corrected apply.
+- If a prior timer fires early against newer metadata, it can report “pending”
+  and exit without providing the intended deadline rollback, so the scheduling
+  identity must bind to the rollout generation.

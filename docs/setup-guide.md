@@ -144,13 +144,21 @@ every named peer must reconnect. Useful follow-up commands are:
 sudo ./scripts/guarded_wireguard_rollout.sh --status --interface wg0
 sudo ./scripts/guarded_wireguard_rollout.sh --verify --interface wg0
 sudo ./scripts/guarded_wireguard_rollout.sh --rollback --interface wg0
+sudo ./scripts/guarded_wireguard_rollout.sh --arm-guard --interface wg0
 ```
+
+Use `--arm-guard` only when a candidate was already applied and the saved
+metadata is still `pending`, but the systemd timer was not created or needs to
+be recreated. It schedules the remaining rollback window from the original
+apply timestamp.
 
 If `wg-quick` fails to restart immediately after applying the candidate, the
 script restores the previous config in the same run and exits nonzero. A later
 `--apply` treats only `pending` metadata as blocking; completed, rolled-back,
 or failed-rolled-back state is archived under the interface state directory
-before the new rollout begins.
+before the new rollout begins. Each scheduled rollback guard includes the apply
+epoch in the transient systemd unit name so a prior timer cannot block the next
+corrected rollout.
 
 ## LAN-VPN Profile
 
