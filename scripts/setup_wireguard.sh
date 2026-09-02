@@ -32,7 +32,7 @@ GENERATE_MISSING_KEYS=0
 SKIP_DNS=0
 WIREGUARD_DNS_HOSTNAME=""
 SKIP_FIREWALL=0
-WIREGUARD_FIREWALL_ZONE="trusted"
+WIREGUARD_FIREWALL_ZONE="wireguard"
 WIREGUARD_PUBLIC_ZONE="public"
 WIREGUARD_PROFILE="wireguard-public-vpn"
 LAN_SUBNET=""
@@ -68,7 +68,7 @@ Options:
   --enable-ip-forward      Write a sysctl drop-in enabling IPv4 and IPv6 forwarding.
   --skip-dns               Do not install or restart the dnsmasq split-DNS helper.
   --skip-firewall          Do not update firewalld for the WireGuard interface.
-  --firewall-zone ZONE     firewalld zone to assign to the WireGuard interface. Default: trusted
+  --firewall-zone ZONE     firewalld zone to assign to the WireGuard interface. Default: wireguard
   --public-zone ZONE       firewalld zone that receives inbound WireGuard UDP traffic.
                            Default: public
   --skip-start             Do not enable or restart wg-quick@wg0 after installing config.

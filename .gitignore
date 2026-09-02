@@ -9,10 +9,8 @@ secrets/
 runtime/
 state/
 config/wireguard/*.local.conf
-config/wireguard/mesh.local.json
-config/wireguard/roaming-policy.local.json
-config/wireguard/access-bundle.local.json
-config/wireguard/mesh.local.d/
+config/wireguard/.wireguard-port-migration-backup
+config/wireguard/port-migration-backup-*/
 
 # Editor and OS noise
 .DS_Store
@@ -31,11 +29,6 @@ scan-cache/
 
 # Validation leftovers
 *.log
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
-*.egg-info/
 
 # Transient diagram export sidecars
 *.cmapx
