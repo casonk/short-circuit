@@ -39,6 +39,8 @@ This repo lives under:
 - `scripts/guarded_wireguard_rollout.sh`: root-run config apply helper
   that snapshots the active config and rolls back automatically if no selected
   peer reconnects
+- `scripts/check_wireguard_edge.sh`: read-only edge preflight that reports
+  the required router UDP forward for the host's current LAN address
 - `scripts/render_wireguard_mesh.py`: fail-closed schema-v2 recovery-mesh
   renderer with schema-v1 in-memory compatibility
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
@@ -114,6 +116,23 @@ The installer will:
 - Open the WireGuard UDP listen port on the WAN-facing firewalld zone.
 - Assign the WireGuard interface to the explicit-service `wireguard` firewalld zone.
 - Enable and start `wg-quick@wg0`.
+
+### Edge Preflight
+
+Before relying on remote access, compare the host's current LAN address with the
+router's UDP forward target:
+
+```bash
+./scripts/check_wireguard_edge.sh \
+  --server-config config/wireguard/wg0-server.public-vpn.local.conf \
+  --client-config config/wireguard/client-peer.mini.public-vpn.local.conf \
+  --expected-router-target 192.168.0.6
+```
+
+The script is read-only. It reports the server listen port, client endpoint,
+current host LAN IPv4, current public IPv4, and the required router rule. If the
+expected target differs from the current host LAN address, it exits nonzero so
+DHCP drift cannot stay silent.
 
 ### Guarded Config Rollout
 

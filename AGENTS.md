@@ -44,6 +44,8 @@ The two supported access profiles are:
 - `scripts/setup_wireguard.sh`: generalized WireGuard installer
 - `scripts/guarded_wireguard_rollout.sh`: rollback-guarded WireGuard config
   applicator
+- `scripts/check_wireguard_edge.sh`: read-only router-forwarding and edge
+  preflight helper
 - `config/wireguard/wg0-server.example.conf`: server config template
 - `config/wireguard/wg0-server.lan-vpn.example.conf`: lan-vpn server template
 - `config/wireguard/client-peer.example.conf`: client peer template

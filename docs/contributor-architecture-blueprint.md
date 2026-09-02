@@ -79,6 +79,14 @@ generation, endpoint auto-fill, client-config export, OS package installation,
 config deploy, split-DNS setup, firewall assignment, and service lifecycle.
 Supports both profiles through a `--profile` flag.
 
+### scripts/check_wireguard_edge.sh
+
+A read-only operator preflight for the public WireGuard edge. It compares the
+server `ListenPort`, client `Endpoint`, detected public IPv4, and current host
+LAN IPv4, then prints the router UDP forward that must exist. With
+`--expected-router-target`, DHCP drift or a stale router rule fails before a
+remote-only maintenance window.
+
 ### scripts/guarded_wireguard_rollout.sh
 
 A root-run config applicator for remote-safe WireGuard changes. It snapshots

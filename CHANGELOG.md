@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `scripts/check_wireguard_edge.sh`: read-only preflight for detecting stale router-forward targets before remote WireGuard work.
 - `--arm-guard` can recreate the timestamped rollback timer for an already-applied pending WireGuard rollout.
 - Guarded WireGuard rollback timer units now include the apply epoch so stale transient timers cannot block a later corrected rollout.
 - Guarded WireGuard rollout state now archives completed or rolled-back metadata before starting the next apply, so a manual rollback does not block a corrected rollout.
