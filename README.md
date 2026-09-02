@@ -126,6 +126,7 @@ router's UDP forward target:
 ./scripts/check_wireguard_edge.sh \
   --server-config config/wireguard/wg0-server.public-vpn.local.conf \
   --client-config config/wireguard/client-peer.mini.public-vpn.local.conf \
+  --lan-interface enp5s0 \
   --expected-router-target 192.168.0.6
 ```
 

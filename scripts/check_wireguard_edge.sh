@@ -6,6 +6,7 @@ INTERFACE="wg0"
 SERVER_CONFIG="${REPO_ROOT}/config/wireguard/wg0-server.public-vpn.local.conf"
 CLIENT_CONFIG="${REPO_ROOT}/config/wireguard/client-peer.public-vpn.local.conf"
 ROUTE_PROBE="1.1.1.1"
+LAN_INTERFACE=""
 EXPECTED_ROUTER_TARGET=""
 SKIP_PUBLIC_IP=0
 
@@ -21,6 +22,7 @@ Options:
   --server-config PATH          Server config to inspect.
   --client-config PATH          Client config to inspect for Endpoint.
   --route-probe IP              IP used for local egress route detection.
+  --lan-interface NAME          Interface whose IPv4 should receive router forwards.
   --expected-router-target IP   Fail if the current host LAN IP differs.
   --skip-public-ip              Do not query the current public IPv4.
   --help                        Show this help.
@@ -81,6 +83,17 @@ detect_lan_ipv4() {
     return
   fi
 
+  if [[ -n "${LAN_INTERFACE}" ]]; then
+    ip -4 -o addr show dev "${LAN_INTERFACE}" scope global | awk '
+      NR == 1 {
+        sub(/\/.*/, "", $4)
+        print $4
+        exit
+      }
+    '
+    return
+  fi
+
   ip -4 route get "${ROUTE_PROBE}" | awk '
     {
       for (i = 1; i <= NF; i++) {
@@ -108,6 +121,7 @@ while [[ $# -gt 0 ]]; do
     --server-config) require_option_value "$1" "${2:-}"; SERVER_CONFIG="$2"; shift 2 ;;
     --client-config) require_option_value "$1" "${2:-}"; CLIENT_CONFIG="$2"; shift 2 ;;
     --route-probe) require_option_value "$1" "${2:-}"; ROUTE_PROBE="$2"; shift 2 ;;
+    --lan-interface) require_option_value "$1" "${2:-}"; LAN_INTERFACE="$2"; shift 2 ;;
     --expected-router-target) require_option_value "$1" "${2:-}"; EXPECTED_ROUTER_TARGET="$2"; shift 2 ;;
     --skip-public-ip) SKIP_PUBLIC_IP=1; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -132,6 +146,9 @@ printf 'server_config: %s\n' "${SERVER_CONFIG}"
 printf 'client_config: %s\n' "${CLIENT_CONFIG}"
 printf 'listen_port: %s\n' "${listen_port}"
 printf 'client_endpoint: %s\n' "${endpoint}"
+if [[ -n "${LAN_INTERFACE}" ]]; then
+  printf 'lan_interface: %s\n' "${LAN_INTERFACE}"
+fi
 printf 'current_host_lan_ipv4: %s\n' "${lan_ipv4}"
 printf 'required_router_forward: UDP %s -> %s:%s\n' "${endpoint_port}" "${lan_ipv4}" "${listen_port}"
 
