@@ -88,7 +88,9 @@ restarts `wg-quick@<interface>`, and arms a transient `systemd-run` verification
 outside the operator's SSH session. Success requires a selected peer to record a
 fresh handshake after the apply epoch; timeout restores the previous config and
 restarts WireGuard. Immediate `wg-quick` restart failure also restores the prior
-config before returning.
+config before returning. The `--arm-guard` mode rehydrates pending metadata to
+schedule the same timestamp-bound guard when an apply succeeded but timer
+creation failed.
 
 ### scripts/render_wireguard_mesh.py
 
