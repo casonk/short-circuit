@@ -52,6 +52,9 @@ The two supported access profiles are:
 - `config/wireguard/client-peer.lan-vpn.example.conf`: lan-vpn client template
 - `docs/setup-guide.md`: step-by-step WireGuard setup walkthrough
 - `docs/access-modes.md`: SMB, HTTPS, and SSH access patterns through the tunnel
+- `docs/macvlan-setup.md`: macvlan interface setup for a parallel spoofed-MAC LAN identity
+- `scripts/setup_macvlan.sh`: create/teardown a persistent macvlan NM connection
+- `config/macvlan/macvlan.example.conf`: macvlan config template
 - `docs/contributor-architecture-blueprint.md`
 - `docs/diagrams/repo-architecture.puml`
 - `docs/diagrams/repo-architecture.drawio`
