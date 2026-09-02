@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `scripts/guarded_wireguard_rollout.sh`: apply reviewed WireGuard
+  candidate configs with root-owned rollback state, a 30-minute systemd guard,
+  fresh-peer-handshake verification, and immediate restore when `wg-quick`
+  rejects the candidate.
 - Initial repository created from WireGuard tooling abstracted out of
   `snowbridge`.
 - `scripts/setup_wireguard.sh`: generalized WireGuard installer supporting

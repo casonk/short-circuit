@@ -181,3 +181,12 @@
 - Bind the temporary peer, client identity, generation, and expiry exactly to
   the active mesh declaration. Canonical peers must stay outside the temporary
   mesh subnet and remain independently reviewed endpoints.
+
+### 2026-09-02 — Remote WireGuard config changes need a host-owned rollback guard
+
+- Apply risky WireGuard config changes through a root-owned guard that
+  snapshots the prior config before restart and schedules verification outside
+  the SSH session. A foreground sleep loop is not a remote-access fail-safe.
+- Judge success by a fresh peer handshake newer than the apply
+  timestamp, not by `wg-quick` being active alone. If the deadline expires
+  first, restore the prior config and restart WireGuard automatically.

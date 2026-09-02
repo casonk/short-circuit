@@ -79,6 +79,17 @@ generation, endpoint auto-fill, client-config export, OS package installation,
 config deploy, split-DNS setup, firewall assignment, and service lifecycle.
 Supports both profiles through a `--profile` flag.
 
+### scripts/guarded_wireguard_rollout.sh
+
+A root-run config applicator for remote-safe WireGuard changes. It snapshots
+the active `/etc/wireguard/<interface>.conf`, stores owner-only rollback state
+under `/var/lib/short-circuit/wireguard-rollout/`, installs a candidate config,
+restarts `wg-quick@<interface>`, and arms a transient `systemd-run` verification
+outside the operator's SSH session. Success requires a selected peer to record a
+fresh handshake after the apply epoch; timeout restores the previous config and
+restarts WireGuard. Immediate `wg-quick` restart failure also restores the prior
+config before returning.
+
 ### scripts/render_wireguard_mesh.py
 
 A fail-closed, render-only tool for the temporary topology. Schema v2 validates
