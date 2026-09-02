@@ -134,9 +134,11 @@ router/DHCP changes:
 ./scripts/check_wireguard_edge.sh \
   --server-config config/wireguard/wg0-server.public-vpn.local.conf \
   --client-config config/wireguard/client-peer.mini.public-vpn.local.conf \
+  --lan-interface enp5s0 \
   --expected-router-target 192.168.0.6
 ```
 
+Use `--lan-interface` when NordVPN or another VPN can own the default route.
 If it reports an expected-target mismatch, fix the router forward before
 changing WireGuard. If it reports the correct target but cellular clients still
 do not handshake, capture packets on the WAN-facing interface while toggling a

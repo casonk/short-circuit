@@ -93,3 +93,24 @@ def test_expected_router_target_mismatch_fails(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "expected router target 192.168.0.7" in result.stderr
     assert "current host LAN IPv4 is 192.168.0.6" in result.stderr
+
+
+def test_lan_interface_option_reports_selected_interface(tmp_path: Path) -> None:
+    server, client = _write_configs(tmp_path)
+
+    result = _run(
+        [
+            "--server-config",
+            str(server),
+            "--client-config",
+            str(client),
+            "--lan-interface",
+            "enp5s0",
+            "--skip-public-ip",
+        ],
+        env=_env(),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "lan_interface: enp5s0" in result.stdout
+    assert "required_router_forward: UDP 41194 -> 192.168.0.6:41194" in result.stdout
