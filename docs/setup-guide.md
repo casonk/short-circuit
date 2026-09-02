@@ -147,7 +147,10 @@ sudo ./scripts/guarded_wireguard_rollout.sh --rollback --interface wg0
 ```
 
 If `wg-quick` fails to restart immediately after applying the candidate, the
-script restores the previous config in the same run and exits nonzero.
+script restores the previous config in the same run and exits nonzero. A later
+`--apply` treats only `pending` metadata as blocking; completed, rolled-back,
+or failed-rolled-back state is archived under the interface state directory
+before the new rollout begins.
 
 ## LAN-VPN Profile
 
