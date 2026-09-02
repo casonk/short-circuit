@@ -36,6 +36,9 @@ This repo lives under:
 ## Repository Layout
 
 - `scripts/setup_wireguard.sh`: installer for either profile
+- `scripts/guarded_wireguard_rollout.sh`: root-run config apply helper
+  that snapshots the active config and rolls back automatically if no selected
+  peer reconnects
 - `scripts/render_wireguard_mesh.py`: fail-closed schema-v2 recovery-mesh
   renderer with schema-v1 in-memory compatibility
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
@@ -111,6 +114,26 @@ The installer will:
 - Open the WireGuard UDP listen port on the WAN-facing firewalld zone.
 - Assign the WireGuard interface to the explicit-service `wireguard` firewalld zone.
 - Enable and start `wg-quick@wg0`.
+
+### Guarded Config Rollout
+
+For remote changes, apply a reviewed candidate config through the
+rollback guard instead of overwriting `/etc/wireguard/wg0.conf` directly:
+
+```bash
+sudo ./scripts/guarded_wireguard_rollout.sh \
+  --apply \
+  --candidate /path/to/wg0.candidate.conf \
+  --interface wg0 \
+  --config /etc/wireguard/wg0.conf
+```
+
+`--apply` snapshots the current config, installs the candidate, restarts
+`wg-quick@wg0`, and arms a root `systemd-run` check for 30 minutes later. If no
+selected peer has a fresh handshake after the apply time, `--verify-or-rollback`
+restores the prior config and restarts WireGuard. Pass `--required-peer
+<public-key>` to monitor a specific device; otherwise the guard derives peers
+from the candidate config and accepts any one fresh handshake.
 
 ### Export a Desktop Client Config
 

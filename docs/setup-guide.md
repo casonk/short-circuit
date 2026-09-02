@@ -114,6 +114,41 @@ source-restricted NAT, NordLynx namespace, host policy route, IPv6 block, or
 kill-switch verification required for `nord-vpn` egress in a schema-v2 mesh.
 Do not treat it as an egress installer.
 
+## Guard Remote Config Changes With Rollback
+
+When changing `/etc/wireguard/wg0.conf` from a remote session, stage the
+new file separately and let the guard apply it:
+
+```bash
+sudo ./scripts/guarded_wireguard_rollout.sh \
+  --apply \
+  --candidate /path/to/wg0.candidate.conf \
+  --interface wg0 \
+  --config /etc/wireguard/wg0.conf \
+  --timeout-seconds 1800
+```
+
+The script stores rollback state under
+`/var/lib/short-circuit/wireguard-rollout/wg0/`, installs the candidate,
+restarts `wg-quick@wg0`, and schedules a root `systemd-run` guard outside the
+SSH session. The guard succeeds only after a selected peer shows a fresh
+handshake newer than the apply timestamp. If the 30-minute deadline expires
+first, it restores the previous config and restarts WireGuard.
+
+By default, all peers in the candidate config are eligible and any one fresh
+handshake confirms the rollout. Use repeated `--required-peer <public-key>`
+flags to name recovery devices explicitly, or add `--require-all-peers` when
+every named peer must reconnect. Useful follow-up commands are:
+
+```bash
+sudo ./scripts/guarded_wireguard_rollout.sh --status --interface wg0
+sudo ./scripts/guarded_wireguard_rollout.sh --verify --interface wg0
+sudo ./scripts/guarded_wireguard_rollout.sh --rollback --interface wg0
+```
+
+If `wg-quick` fails to restart immediately after applying the candidate, the
+script restores the previous config in the same run and exits nonzero.
+
 ## LAN-VPN Profile
 
 ```bash
