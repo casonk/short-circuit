@@ -114,6 +114,41 @@ source-restricted NAT, NordLynx namespace, host policy route, IPv6 block, or
 kill-switch verification required for `nord-vpn` egress in a schema-v2 mesh.
 Do not treat it as an egress installer.
 
+## Check Router Forwarding Before Remote Work
+
+Reserve the Linux host's LAN address in the router DHCP settings, then keep the
+router's WireGuard rule pointed at that reserved address. For the current
+public profile, the rule should have this shape:
+
+```text
+Protocol: UDP
+External port: <client Endpoint port>
+Internal IP: <current host LAN IPv4>
+Internal port: <server ListenPort>
+```
+
+Run the read-only edge preflight before leaving the machine remote-only or after
+router/DHCP changes:
+
+```bash
+./scripts/check_wireguard_edge.sh \
+  --server-config config/wireguard/wg0-server.public-vpn.local.conf \
+  --client-config config/wireguard/client-peer.mini.public-vpn.local.conf \
+  --expected-router-target 192.168.0.6
+```
+
+If it reports an expected-target mismatch, fix the router forward before
+changing WireGuard. If it reports the correct target but cellular clients still
+do not handshake, capture packets on the WAN-facing interface while toggling a
+client tunnel:
+
+```bash
+sudo timeout 30 tcpdump -ni enp5s0 udp port <client Endpoint port>
+```
+
+Packets arriving means debug keys or live WireGuard state. No packets arriving
+means debug router forwarding, NAT, ISP, or upstream path first.
+
 ## Guard Remote Config Changes With Rollback
 
 When changing `/etc/wireguard/wg0.conf` from a remote session, stage the
