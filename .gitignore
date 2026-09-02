@@ -9,6 +9,7 @@ secrets/
 runtime/
 state/
 config/wireguard/*.local.conf
+config/macvlan/*.local.conf
 config/wireguard/.wireguard-port-migration-backup
 config/wireguard/port-migration-backup-*/
 config/wireguard/mesh.local.json
