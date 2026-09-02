@@ -9,7 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "guarded_wireguard_rollout.sh"
 PEER_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa="
-PEER_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb="
+PEER_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb="
 
 
 def _write_fake_bin(path: Path, name: str, body: str) -> None:
@@ -191,6 +191,73 @@ printf 'systemd-run %s\n' "$*" >> {log}
         encoding="utf-8"
     )
     assert "systemd-run" not in log.read_text(encoding="utf-8")
+
+
+def test_apply_archives_completed_rollout_state_before_new_apply(tmp_path: Path) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    log = tmp_path / "commands.log"
+    state_root = tmp_path / "state"
+    state_dir = state_root / "wg0"
+    _metadata(state_root, apply_epoch=100, timeout=1800, peers=PEER_A)
+    metadata = state_dir / "rollout.env"
+    metadata.write_text(
+        metadata.read_text(encoding="utf-8").replace("STATUS=pending", "STATUS=rolled-back"),
+        encoding="utf-8",
+    )
+    active = state_dir / "active.conf"
+    candidate = tmp_path / "candidate.conf"
+    active.write_text("old config\n", encoding="utf-8")
+    (state_dir / "previous.conf").write_text("previous config\n", encoding="utf-8")
+    (state_dir / "candidate.conf").write_text("old candidate\n", encoding="utf-8")
+    candidate.write_text(
+        textwrap.dedent(
+            f"""
+            [Interface]
+            Address = 10.99.0.1/24
+
+            [Peer]
+            PublicKey = {PEER_B}
+            AllowedIPs = 10.99.0.3/32
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    _write_fake_bin(fake_bin, "wg", "#!/usr/bin/env bash\nexit 0\n")
+    _write_fake_bin(
+        fake_bin,
+        "systemctl",
+        f"""#!/usr/bin/env bash
+printf 'systemctl %s\n' "$*" >> {log}
+""",
+    )
+    _write_fake_bin(
+        fake_bin,
+        "systemd-run",
+        f"""#!/usr/bin/env bash
+printf 'systemd-run %s\n' "$*" >> {log}
+""",
+    )
+
+    result = _run(
+        tmp_path,
+        [
+            "--apply",
+            "--candidate",
+            str(candidate),
+            "--config",
+            str(active),
+            "--state-root",
+            str(state_root),
+        ],
+        env=_env(fake_bin),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert active.read_text(encoding="utf-8") == candidate.read_text(encoding="utf-8")
+    assert "archived prior rolled-back rollout state" in result.stdout
+    assert list((state_dir / "archive").glob("*-rolled-back/rollout.env"))
+    assert PEER_B in (state_dir / "rollout.env").read_text(encoding="utf-8")
 
 
 def test_verify_marks_success_after_fresh_required_handshake(tmp_path: Path) -> None:
