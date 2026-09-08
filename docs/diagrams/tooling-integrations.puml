@@ -5,59 +5,207 @@ skinparam shadowing false
 skinparam defaultFontName Monospace
 skinparam componentStyle rectangle
 skinparam linetype ortho
-rectangle ".github/workflows/ci.yml\n4 detected tools" as source_github_workflows_ci_yml #E0F2FE
-rectangle ".github/workflows/secret-scan.yml\n2 detected tools" as source_github_workflows_secret_scan_yml #E0F2FE
+rectangle ".github/workflows/ci.yml\n1 detected tool" as source_github_workflows_ci_yml #E0F2FE
+rectangle ".github/workflows/secret-scan.yml\n1 detected tool" as source_github_workflows_secret_scan_yml #E0F2FE
+rectangle "config/service-failure-notify\n2 detected tools" as source_config_service_failure_notify #E0F2FE
+rectangle "containers/nord-egress/Containerfile\n8 detected tools" as source_containers_nord_egress_containerfile #E0F2FE
+rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n33 detected tools" as source_containers_nord_egress_nord_egress_entrypoint_sh #E0F2FE
+rectangle "scripts/check_wireguard_edge.sh\n9 detected tools" as source_scripts_check_wireguard_edge_sh #E0F2FE
+rectangle "scripts/guarded_wireguard_rollout.sh\n14 detected tools" as source_scripts_guarded_wireguard_rollout_sh #E0F2FE
+rectangle "scripts/install_failure_notifier.sh\n4 detected tools" as source_scripts_install_failure_notifier_sh #E0F2FE
 rectangle "scripts/run_tachometer_profile.sh\n3 detected tools" as source_scripts_run_tachometer_profile_sh #E0F2FE
+rectangle "scripts/setup_macvlan.sh\n12 detected tools" as source_scripts_setup_macvlan_sh #E0F2FE
 rectangle "scripts/setup_wireguard.sh\n22 detected tools" as source_scripts_setup_wireguard_sh #E0F2FE
+rectangle "tests/containers/nord-token-login/Containerfile\n6 detected tools" as source_tests_containers_nord_token_login_containerfile #E0F2FE
+rectangle "tests/containers/nord-token-login/Containerfile.real-prompt\n1 detected tool" as source_tests_containers_nord_token_login_containerfile_real_prompt #E0F2FE
+rectangle "tests/containers/nord-token-login/probe-real-cli.sh\n3 detected tools" as source_tests_containers_nord_token_login_probe_real_cli_sh #E0F2FE
+rectangle "tests/containers/nord-token-login/run-test.sh\n7 detected tools" as source_tests_containers_nord_token_login_run_test_sh #E0F2FE
+rectangle "tests/test_nord_token_login_podman.sh\n2 detected tools" as source_tests_test_nord_token_login_podman_sh #E0F2FE
+cloud "%d" as tool_d #FEF3C7
+cloud "%s\\n" as tool_s_n #FEF3C7
+cloud "(i" as tool_i #FEF3C7
+cloud "*[!A-Za-z0-9_-]*" as tool_a_za_z0_9 #FEF3C7
+cloud "5" as tool_tool_5 #FEF3C7
+cloud ">&2" as tool_tool_2 #FEF3C7
+cloud "Diagnose" as tool_diagnose #FEF3C7
 cloud "Endpoint" as tool_endpoint #FEF3C7
+cloud "Last" as tool_last #FEF3C7
+cloud "[!A-Za-z0-9]*" as tool_a_za_z0_9_2 #FEF3C7
+cloud "[[:space:]])dev" as tool_space_dev #FEF3C7
+cloud "[[:space:]]*(" as tool_space #FEF3C7
 cloud "[nN]" as tool_nn #FEF3C7
 cloud "[nN][oO]" as tool_nn_oo #FEF3C7
 cloud "[yY]" as tool_yy #FEF3C7
-cloud "actions/checkout" as tool_actions_checkout #FEF3C7
-cloud "actions/setup-python" as tool_actions_setup_python #FEF3C7
+cloud "\\000" as tool_tool_000 #FEF3C7
+cloud "^[[:space:]]*" as tool_space_2 #FEF3C7
+cloud "^[[:space:]]*PublicKey[[:space:]]*=" as tool_space_publickey_space #FEF3C7
+cloud "^[[:space:]]*[" as tool_space_3 #FEF3C7
 cloud "apt-get" as tool_apt_get #FEF3C7
+cloud "block_size" as tool_block_size #FEF3C7
+cloud "casonk/.github/.github/workflows/python-ci.yml" as tool_casonk_github_github_workflows_python_ci_yml #FEF3C7
+cloud "casonk/.github/.github/workflows/secret-scan.yml" as tool_casonk_github_github_workflows_secret_scan_yml #FEF3C7
 cloud "cat" as tool_cat #FEF3C7
+cloud "cc" as tool_cc #FEF3C7
+cloud "chmod" as tool_chmod #FEF3C7
 cloud "client-private-key" as tool_client_private_key #FEF3C7
+cloud "cloned-mac" as tool_cloned_mac #FEF3C7
+cloud "count" as tool_count #FEF3C7
+cloud "cp" as tool_cp #FEF3C7
+cloud "curl" as tool_curl #FEF3C7
 cloud "dnf" as tool_dnf #FEF3C7
+cloud "docker" as tool_docker #FEF3C7
 cloud "firewall-cmd" as tool_firewall_cmd #FEF3C7
-cloud "gitleaks/gitleaks-action" as tool_gitleaks_gitleaks_action #FEF3C7
+cloud "first_address" as tool_first_address #FEF3C7
+cloud "gpasswd" as tool_gpasswd #FEF3C7
 cloud "grep" as tool_grep #FEF3C7
+cloud "head" as tool_head #FEF3C7
+cloud "i" as tool_i_2 #FEF3C7
 cloud "icanhazip.com" as tool_icanhazip_com #FEF3C7
+cloud "in_peer" as tool_in_peer #FEF3C7
+cloud "index" as tool_index #FEF3C7
 cloud "install" as tool_install #FEF3C7
-cloud "pip" as tool_pip #FEF3C7
-cloud "pre-commit" as tool_pre_commit #FEF3C7
+cloud "ip" as tool_ip #FEF3C7
+cloud "ipv6.method" as tool_ipv6_method #FEF3C7
+cloud "last_address" as tool_last_address #FEF3C7
+cloud "mv" as tool_mv #FEF3C7
+cloud "next" as tool_next #FEF3C7
+cloud "nft" as tool_nft #FEF3C7
+cloud "nmcli" as tool_nmcli #FEF3C7
+cloud "nord-egress" as tool_nord_egress #FEF3C7
+cloud "nord-token-login" as tool_nord_token_login #FEF3C7
+cloud "nordvpn" as tool_nordvpn #FEF3C7
+cloud "null" as tool_null #FEF3C7
+cloud "octet" as tool_octet #FEF3C7
+cloud "podman" as tool_podman #FEF3C7
+cloud "prefix" as tool_prefix #FEF3C7
+cloud "previous_address" as tool_previous_address #FEF3C7
 cloud "print" as tool_print #FEF3C7
 cloud "qrencode" as tool_qrencode #FEF3C7
+cloud "readlink" as tool_readlink #FEF3C7
 cloud "rm" as tool_rm #FEF3C7
 cloud "run" as tool_run #FEF3C7
+cloud "sed" as tool_sed #FEF3C7
 cloud "server-public-key" as tool_server_public_key #FEF3C7
+cloud "sha256sum" as tool_sha256sum #FEF3C7
+cloud "sleep" as tool_sleep #FEF3C7
+cloud "source_address" as tool_source_address #FEF3C7
+cloud "source_count" as tool_source_count #FEF3C7
+cloud "source_index" as tool_source_index #FEF3C7
+cloud "source_parts[2]" as tool_source_parts_2 #FEF3C7
+cloud "sources" as tool_sources #FEF3C7
+cloud "strip" as tool_strip #FEF3C7
+cloud "subnet_base" as tool_subnet_base #FEF3C7
+cloud "subnet_parts[2]" as tool_subnet_parts_2 #FEF3C7
+cloud "substr(parts[index]," as tool_substr_parts_index #FEF3C7
+cloud "substr(subnet_parts[2]," as tool_substr_subnet_parts_2 #FEF3C7
 cloud "summarize" as tool_summarize #FEF3C7
 cloud "sysctl" as tool_sysctl #FEF3C7
 cloud "systemctl" as tool_systemctl #FEF3C7
 cloud "tachometer" as tool_tachometer #FEF3C7
+cloud "tr" as tool_tr #FEF3C7
+cloud "uuid" as tool_uuid #FEF3C7
 cloud "value" as tool_value #FEF3C7
 cloud "wg" as tool_wg #FEF3C7
+cloud "wget" as tool_wget #FEF3C7
 cloud "wireguard-public-vpn" as tool_wireguard_public_vpn #FEF3C7
 cloud "yum" as tool_yum #FEF3C7
-source_github_workflows_ci_yml --> tool_actions_checkout
-source_github_workflows_ci_yml --> tool_actions_setup_python
-source_github_workflows_ci_yml --> tool_pip
-source_github_workflows_ci_yml --> tool_pre_commit
-source_github_workflows_secret_scan_yml --> tool_actions_checkout
-source_github_workflows_secret_scan_yml --> tool_gitleaks_gitleaks_action
+source_github_workflows_ci_yml --> tool_casonk_github_github_workflows_python_ci_yml
+source_github_workflows_secret_scan_yml --> tool_casonk_github_github_workflows_secret_scan_yml
+source_config_service_failure_notify --> tool_diagnose
+source_config_service_failure_notify --> tool_last
+source_containers_nord_egress_containerfile --> tool_apt_get
+source_containers_nord_egress_containerfile --> tool_cc
+source_containers_nord_egress_containerfile --> tool_docker
+source_containers_nord_egress_containerfile --> tool_gpasswd
+source_containers_nord_egress_containerfile --> tool_rm
+source_containers_nord_egress_containerfile --> tool_sha256sum
+source_containers_nord_egress_containerfile --> tool_strip
+source_containers_nord_egress_containerfile --> tool_wget
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_s_n
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_a_za_z0_9
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_tool_5
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_tool_2
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_a_za_z0_9_2
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_space_dev
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_block_size
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_count
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_first_address
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_grep
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_index
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_ip
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_last_address
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_nft
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_nordvpn
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_null
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_octet
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_prefix
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_previous_address
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sed
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sleep
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_address
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_count
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_index
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_parts_2
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sources
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_subnet_base
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_subnet_parts_2
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_substr_parts_index
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_substr_subnet_parts_2
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sysctl
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_tr
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_value
+source_scripts_check_wireguard_edge_sh --> tool_i
+source_scripts_check_wireguard_edge_sh --> tool_space
+source_scripts_check_wireguard_edge_sh --> tool_space_2
+source_scripts_check_wireguard_edge_sh --> tool_cat
+source_scripts_check_wireguard_edge_sh --> tool_curl
+source_scripts_check_wireguard_edge_sh --> tool_i_2
+source_scripts_check_wireguard_edge_sh --> tool_ip
+source_scripts_check_wireguard_edge_sh --> tool_print
+source_scripts_check_wireguard_edge_sh --> tool_value
+source_scripts_guarded_wireguard_rollout_sh --> tool_space
+source_scripts_guarded_wireguard_rollout_sh --> tool_space_publickey_space
+source_scripts_guarded_wireguard_rollout_sh --> tool_space_3
+source_scripts_guarded_wireguard_rollout_sh --> tool_cat
+source_scripts_guarded_wireguard_rollout_sh --> tool_chmod
+source_scripts_guarded_wireguard_rollout_sh --> tool_cp
+source_scripts_guarded_wireguard_rollout_sh --> tool_in_peer
+source_scripts_guarded_wireguard_rollout_sh --> tool_install
+source_scripts_guarded_wireguard_rollout_sh --> tool_mv
+source_scripts_guarded_wireguard_rollout_sh --> tool_next
+source_scripts_guarded_wireguard_rollout_sh --> tool_readlink
+source_scripts_guarded_wireguard_rollout_sh --> tool_sleep
+source_scripts_guarded_wireguard_rollout_sh --> tool_systemctl
+source_scripts_guarded_wireguard_rollout_sh --> tool_wg
+source_scripts_install_failure_notifier_sh --> tool_cat
+source_scripts_install_failure_notifier_sh --> tool_chmod
+source_scripts_install_failure_notifier_sh --> tool_install
+source_scripts_install_failure_notifier_sh --> tool_systemctl
 source_scripts_run_tachometer_profile_sh --> tool_run
 source_scripts_run_tachometer_profile_sh --> tool_summarize
 source_scripts_run_tachometer_profile_sh --> tool_tachometer
+source_scripts_setup_macvlan_sh --> tool_d
+source_scripts_setup_macvlan_sh --> tool_cat
+source_scripts_setup_macvlan_sh --> tool_cloned_mac
+source_scripts_setup_macvlan_sh --> tool_cp
+source_scripts_setup_macvlan_sh --> tool_grep
+source_scripts_setup_macvlan_sh --> tool_head
+source_scripts_setup_macvlan_sh --> tool_ip
+source_scripts_setup_macvlan_sh --> tool_ipv6_method
+source_scripts_setup_macvlan_sh --> tool_mv
+source_scripts_setup_macvlan_sh --> tool_nmcli
+source_scripts_setup_macvlan_sh --> tool_tr
+source_scripts_setup_macvlan_sh --> tool_uuid
 source_scripts_setup_wireguard_sh --> tool_endpoint
 source_scripts_setup_wireguard_sh --> tool_nn
 source_scripts_setup_wireguard_sh --> tool_nn_oo
 source_scripts_setup_wireguard_sh --> tool_yy
+source_scripts_setup_wireguard_sh --> tool_space_2
 source_scripts_setup_wireguard_sh --> tool_apt_get
 source_scripts_setup_wireguard_sh --> tool_cat
 source_scripts_setup_wireguard_sh --> tool_client_private_key
 source_scripts_setup_wireguard_sh --> tool_dnf
 source_scripts_setup_wireguard_sh --> tool_firewall_cmd
-source_scripts_setup_wireguard_sh --> tool_grep
 source_scripts_setup_wireguard_sh --> tool_icanhazip_com
 source_scripts_setup_wireguard_sh --> tool_install
 source_scripts_setup_wireguard_sh --> tool_print
@@ -70,8 +218,27 @@ source_scripts_setup_wireguard_sh --> tool_value
 source_scripts_setup_wireguard_sh --> tool_wg
 source_scripts_setup_wireguard_sh --> tool_wireguard_public_vpn
 source_scripts_setup_wireguard_sh --> tool_yum
+source_tests_containers_nord_token_login_containerfile --> tool_apt_get
+source_tests_containers_nord_token_login_containerfile --> tool_cc
+source_tests_containers_nord_token_login_containerfile --> tool_docker
+source_tests_containers_nord_token_login_containerfile --> tool_install
+source_tests_containers_nord_token_login_containerfile --> tool_mv
+source_tests_containers_nord_token_login_containerfile --> tool_rm
+source_tests_containers_nord_token_login_containerfile_real_prompt --> tool_docker
+source_tests_containers_nord_token_login_probe_real_cli_sh --> tool_grep
+source_tests_containers_nord_token_login_probe_real_cli_sh --> tool_nordvpn
+source_tests_containers_nord_token_login_probe_real_cli_sh --> tool_sleep
+source_tests_containers_nord_token_login_run_test_sh --> tool_tool_000
+source_tests_containers_nord_token_login_run_test_sh --> tool_chmod
+source_tests_containers_nord_token_login_run_test_sh --> tool_head
+source_tests_containers_nord_token_login_run_test_sh --> tool_install
+source_tests_containers_nord_token_login_run_test_sh --> tool_nord_token_login
+source_tests_containers_nord_token_login_run_test_sh --> tool_sleep
+source_tests_containers_nord_token_login_run_test_sh --> tool_tr
+source_tests_test_nord_token_login_podman_sh --> tool_nord_egress
+source_tests_test_nord_token_login_podman_sh --> tool_podman
 note as toolingGraphSummary
-Scanned 4 tooling entrypoints.
-Detected 30 third-party tools.
+Scanned 16 tooling entrypoints.
+Detected 88 third-party tools.
 end note
 @enduml
