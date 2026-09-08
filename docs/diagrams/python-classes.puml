@@ -1,8 +1,11 @@
 @startuml classes_short-circuit
 set namespaceSeparator none
-note as archilityPythonSurfaceNote
-Minimal class surface detected.
-Scanned 1 Python module.
-See python-import-deps-conftest.svg for module-level imports.
-end note
+class "<color:red>AccessBundleError</color>" as scripts.render_wireguard_access_bundle.AccessBundleError {
+}
+class "<color:red>MeshError</color>" as scripts.render_wireguard_mesh.MeshError {
+}
+class "<color:red>NordEgressError</color>" as scripts.render_nord_egress_container.NordEgressError {
+}
+class "<color:red>RoamingPolicyError</color>" as scripts.render_roaming_policy.RoamingPolicyError {
+}
 @enduml
