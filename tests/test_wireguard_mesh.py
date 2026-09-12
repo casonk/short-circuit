@@ -30,6 +30,9 @@ PUBLIC_D = base64.b64encode(bytes([0x44]) * 32).decode("ascii")
 DEFAULT_EXPIRY = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=7)).strftime(
     "%Y-%m-%dT%H:%M:%SZ"
 )
+ROTATION_HORIZON = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=180)).strftime(
+    "%Y-%m-%dT%H:%M:%SZ"
+)
 
 
 def active_document() -> dict[str, object]:
@@ -126,6 +129,16 @@ def nord_egress_document() -> dict[str, object]:
         "dns_servers": ["103.86.96.100", "103.86.99.100"],
         "ipv6_policy": "block",
     }
+    return document
+
+
+def permanent_document() -> dict[str, object]:
+    """A schema-v3 permanent mesh: no implicit expiry, a scheduled rotation."""
+    document = active_document()
+    document["schema_version"] = 3
+    document["expires_at"] = None
+    document["rotate_at"] = ROTATION_HORIZON
+    document["nodes"][1]["platform"] = "linux"  # permanent home hub is Linux
     return document
 
 
@@ -578,6 +591,84 @@ else:
             with self.subTest(candidate=candidate):
                 with self.assertRaises(mesh.MeshError):
                     mesh.validate_document(candidate, now=reference)
+
+    def test_schema_v3_permanent_lifetime_and_rotation(self) -> None:
+        document = permanent_document()
+        normalized = mesh.validate_document(document)
+        self.assertEqual(normalized["schema_version"], 3)
+        # A permanent mesh has no implicit expiry and carries its rotation horizon.
+        self.assertIsNone(normalized["expires_at"])
+        self.assertEqual(normalized["rotate_at"], document["rotate_at"])
+
+        # The canonical binding and rendered manifest reflect v3 and rotate_at,
+        # so dependent renderers see the permanent lifetime.
+        binding = mesh.build_mesh_binding(document)
+        self.assertEqual(binding["schema_version"], 3)
+        self.assertEqual(binding["rotate_at"], document["rotate_at"])
+
+        # rotate_at is optional (rotation may be unscheduled) ...
+        no_rotation = copy.deepcopy(document)
+        no_rotation["rotate_at"] = None
+        self.assertIsNone(mesh.validate_document(no_rotation)["rotate_at"])
+
+        # ... but a past or beyond-horizon rotate_at is rejected.
+        past = copy.deepcopy(document)
+        past["rotate_at"] = "2020-01-01T00:00:00Z"
+        with self.assertRaisesRegex(mesh.MeshError, "rotate_at must be in the future"):
+            mesh.validate_document(past)
+        far = copy.deepcopy(document)
+        far["rotate_at"] = (
+            dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=500)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with self.assertRaisesRegex(mesh.MeshError, "400 days"):
+            mesh.validate_document(far)
+
+        # A far-future explicit expiry is allowed (no 31-day cap in v3) ...
+        far_expiry = copy.deepcopy(document)
+        far_expiry["expires_at"] = "2099-01-01T00:00:00Z"
+        self.assertEqual(
+            mesh.validate_document(far_expiry)["expires_at"], "2099-01-01T00:00:00Z"
+        )
+        # ... but an already-expired one is still rejected.
+        expired = copy.deepcopy(document)
+        expired["expires_at"] = "2020-01-01T00:00:00Z"
+        with self.assertRaisesRegex(mesh.MeshError, "expired"):
+            mesh.validate_document(expired)
+
+    def test_schema_v2_does_not_gain_permanent_semantics(self) -> None:
+        # v2 must keep requiring a bounded, non-null expiry and must not accept
+        # the v3-only rotate_at field.
+        null_expiry = active_document()
+        null_expiry["expires_at"] = None
+        with self.assertRaisesRegex(mesh.MeshError, "expires_at"):
+            mesh.validate_document(null_expiry)
+        with_rotation = active_document()
+        with_rotation["rotate_at"] = ROTATION_HORIZON
+        with self.assertRaisesRegex(mesh.MeshError, "unsupported field"):
+            mesh.validate_document(with_rotation)
+
+    def test_schema_v3_generation_zero_stays_inert(self) -> None:
+        inert = {
+            "schema_version": 3,
+            "generation": 0,
+            "mesh": {
+                "name": "home-permanent-mesh",
+                "subnet": "10.99.0.240/28",
+                "listen_port": 51821,
+                "peer_transit": False,
+            },
+            "failover_mode": "manual-static",
+            "cutover_epoch": 0,
+            "expires_at": None,
+            "rotate_at": None,
+            "egress": {"mode": "disabled", "gateway_node_id": None},
+            "nodes": [],
+        }
+        self.assertEqual(mesh.validate_document(inert)["schema_version"], 3)
+        rotating_inert = copy.deepcopy(inert)
+        rotating_inert["rotate_at"] = ROTATION_HORIZON
+        with self.assertRaisesRegex(mesh.MeshError, "inert"):
+            mesh.validate_document(rotating_inert)
 
     def test_default_render_paths_are_generation_scoped(self) -> None:
         config_dir = self.root / "config" / "wireguard"
