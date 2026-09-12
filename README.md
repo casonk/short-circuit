@@ -45,7 +45,11 @@ This repo lives under:
   Schema v2 (with schema-v1 in-memory compatibility) is the temporary,
   ≤31-day recovery mesh; schema v3 adds a **permanent** mesh (`expires_at`
   may be null — no implicit expiry) with an optional `rotate_at` scheduled
-  key-rotation horizon
+  key-rotation horizon; schema v4 adds a **dual-hub** mesh — a shared virtual
+  hub identity (one keypair/address/endpoint) hosted by a primary plus
+  standbys, with `leased-active-standby` failover fenced by a named lease so
+  exactly one host is active. v4 validation ships now; its rendering and the
+  lease-enforcing activation land in follow-up changes
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
@@ -343,6 +347,20 @@ is due. `rotate_at` is planning metadata surfaced in the manifest and binding,
 not a runtime kill switch; the rotation itself is a deliberate re-key, analogous
 to renewing a time-bound certificate. A permanent mesh that still sets an
 explicit far-future `expires_at` keeps the enforced fence at that date.
+
+A **schema-v4 dual-hub mesh** replaces the single hub node with a `hub_group`: one
+shared virtual identity (`virtual_public_key`, `virtual_address`, and a single
+client-facing `client_endpoint` that every leaf uses) hosted by exactly one
+`primary` plus optional `standby` hosts. Because the hosts share one WireGuard
+identity, a leaf imports one stable profile and never re-imports on failover; the
+client endpoint is a DNS name a DDNS updater keeps pointed at the active host.
+Split-brain is prevented by fencing: `failover_mode` is `leased-active-standby`
+and a `fencing` block names the lease (`source: differential`) whose holder is
+the sole host allowed to activate. The renderer stays render-only — it validates
+and will declare the lease requirement in each host manifest; enforcing the lease
+at activation is a separate, differential-integrated step. nord egress and
+`peer_transit` are not yet supported under v4. See
+`config/wireguard/mesh.dualhub.example.json`.
 `Persistent=true` covers a missed timer deadline after downtime, and the startup
 gate independently rejects an already expired generation.
 
