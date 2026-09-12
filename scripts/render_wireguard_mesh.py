@@ -27,12 +27,20 @@ from typing import Any
 
 SCHEMA_VERSION = 2
 LEGACY_SCHEMA_VERSION = 1
+PERMANENT_SCHEMA_VERSION = 3
+SUPPORTED_SCHEMA_VERSIONS = (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION, PERMANENT_SCHEMA_VERSION)
 DEFAULT_CONFIG = Path("config/wireguard/mesh.local.json")
 DEFAULT_STATE_ROOT = Path("config/wireguard/mesh.local.d")
 MAX_CONFIG_BYTES = 1024 * 1024
 MAX_KEY_BYTES = 256
 WG_TIMEOUT_SECONDS = 10
+# Schema v1/v2 are temporary recovery meshes and cap the active lifetime at 31
+# days. Schema v3 adds a permanent mesh: expires_at may be null (no implicit
+# expiry), and an optional rotate_at records the next scheduled key rotation
+# (a planned re-key, like a time-bound certificate) capped at ~13 months so a
+# permanent mesh still names a concrete rotation horizon rather than "never".
 MAX_ACTIVE_LIFETIME = dt.timedelta(days=31)
+MAX_ROTATION_HORIZON = dt.timedelta(days=400)
 
 NODE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,14}$")
 MESH_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
@@ -59,6 +67,7 @@ V1_TOP_LEVEL_FIELDS = {
     "nodes",
 }
 V2_TOP_LEVEL_FIELDS = V1_TOP_LEVEL_FIELDS | {"egress"}
+V3_TOP_LEVEL_FIELDS = V2_TOP_LEVEL_FIELDS | {"rotate_at"}
 V1_MESH_FIELDS = {"name", "subnet", "listen_port"}
 V2_MESH_FIELDS = V1_MESH_FIELDS | {"peer_transit"}
 V1_NODE_FIELDS = {"id", "role", "address", "public_key", "underlay_endpoint"}
@@ -336,24 +345,60 @@ def _parse_hub_transport(
     return {"mode": mode, "endpoint": f"{normalized_host}:{port}"}
 
 
-def _parse_expiry(value: Any, *, now: dt.datetime) -> str:
-    expiry_text = _require_string(value, "expires_at")
-    if not RFC3339_UTC_RE.fullmatch(expiry_text):
-        raise MeshError("expires_at must use canonical UTC form YYYY-MM-DDTHH:MM:SSZ")
+def _parse_utc_timestamp(value: Any, label: str) -> dt.datetime:
+    text = _require_string(value, label)
+    if not RFC3339_UTC_RE.fullmatch(text):
+        raise MeshError(f"{label} must use canonical UTC form YYYY-MM-DDTHH:MM:SSZ")
     try:
-        expiry = dt.datetime.strptime(expiry_text, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=dt.timezone.utc
-        )
+        return dt.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
     except ValueError as error:
-        raise MeshError("expires_at is not a valid UTC timestamp") from error
+        raise MeshError(f"{label} is not a valid UTC timestamp") from error
+
+
+def _now_utc(now: dt.datetime) -> dt.datetime:
     if now.tzinfo is None:
         now = now.replace(tzinfo=dt.timezone.utc)
-    now_utc = now.astimezone(dt.timezone.utc)
+    return now.astimezone(dt.timezone.utc)
+
+
+def _parse_expiry(
+    value: Any,
+    *,
+    now: dt.datetime,
+    allow_null: bool = False,
+    max_lifetime: dt.timedelta | None = MAX_ACTIVE_LIFETIME,
+) -> str | None:
+    """Validate an active mesh's expiry.
+
+    v1/v2 recovery meshes call this with the defaults: expiry is required and
+    capped at 31 days. A permanent v3 mesh passes allow_null=True (expires_at may
+    be null, meaning no implicit expiry) and max_lifetime=None (no 31-day cap);
+    an expiry that is present must still be in the future.
+    """
+    if value is None:
+        if allow_null:
+            return None
+        raise MeshError("an active mesh requires a non-null expires_at")
+    expiry = _parse_utc_timestamp(value, "expires_at")
+    now_utc = _now_utc(now)
     if expiry <= now_utc:
         raise MeshError("the active mesh document has expired")
-    if expiry > now_utc + MAX_ACTIVE_LIFETIME:
+    if max_lifetime is not None and expiry > now_utc + max_lifetime:
         raise MeshError("expires_at must be no more than 31 days in the future")
-    return expiry_text
+    return value
+
+
+def _parse_rotate_at(value: Any, *, now: dt.datetime) -> str | None:
+    """Validate a permanent mesh's optional scheduled key-rotation horizon."""
+    if value is None:
+        return None
+    rotate = _parse_utc_timestamp(value, "rotate_at")
+    now_utc = _now_utc(now)
+    if rotate <= now_utc:
+        raise MeshError("rotate_at must be in the future")
+    if rotate > now_utc + MAX_ROTATION_HORIZON:
+        raise MeshError("rotate_at must be no more than 400 days in the future")
+    return value
 
 
 def _validate_mesh_identity(
@@ -715,6 +760,150 @@ def _validate_v2_document(document: Any, *, now: dt.datetime) -> dict[str, Any]:
     }
 
 
+def _validate_v3_document(document: Any, *, now: dt.datetime) -> dict[str, Any]:
+    """Validate a schema-v3 (permanent) mesh document.
+
+    v3 keeps every v2 invariant (one hub, the reserved recovery overlay,
+    manual-static failover, the egress model) and changes only the lifetime:
+    expires_at may be null for a permanent mesh, there is no 31-day cap, and an
+    optional rotate_at records the next scheduled key rotation.
+    """
+    root = _require_object(document, "document")
+    _require_exact_fields(root, V3_TOP_LEVEL_FIELDS, "document")
+    if root["schema_version"] != PERMANENT_SCHEMA_VERSION:
+        raise MeshError(f"schema_version must be {PERMANENT_SCHEMA_VERSION}")
+    generation = _require_int(root["generation"], "generation", minimum=0)
+    mesh_name, overlay, listen_port, peer_transit = _validate_mesh_identity(
+        root["mesh"], fields=V2_MESH_FIELDS, include_peer_transit=True
+    )
+    if root["failover_mode"] != "manual-static":
+        raise MeshError("failover_mode must be manual-static")
+    cutover_epoch = _require_int(root["cutover_epoch"], "cutover_epoch", minimum=0)
+    nodes_value = root["nodes"]
+    if not isinstance(nodes_value, list):
+        raise MeshError("nodes must be a JSON array")
+
+    if generation == 0:
+        egress = _validate_egress(root["egress"], nodes=[])
+        if (
+            cutover_epoch != 0
+            or root["expires_at"] is not None
+            or root["rotate_at"] is not None
+            or nodes_value
+            or peer_transit
+            or egress["mode"] != "disabled"
+        ):
+            raise MeshError(
+                "generation 0 must be inert: epoch 0, null expiry, null rotation, "
+                "no nodes, no transit, and no egress"
+            )
+        return {
+            "schema_version": PERMANENT_SCHEMA_VERSION,
+            "generation": 0,
+            "mesh": {
+                "name": mesh_name,
+                "subnet": str(overlay),
+                "listen_port": listen_port,
+                "peer_transit": False,
+            },
+            "failover_mode": "manual-static",
+            "cutover_epoch": 0,
+            "expires_at": None,
+            "rotate_at": None,
+            "egress": egress,
+            "nodes": [],
+        }
+
+    if cutover_epoch < 1:
+        raise MeshError("an active generation requires cutover_epoch of 1 or greater")
+    expires_at = _parse_expiry(root["expires_at"], now=now, allow_null=True, max_lifetime=None)
+    rotate_at = _parse_rotate_at(root["rotate_at"], now=now)
+    if len(nodes_value) < 2:
+        raise MeshError("an active mesh requires a hub and at least one leaf")
+
+    normalized_nodes: list[dict[str, Any]] = []
+    node_ids: set[str] = set()
+    node_addresses: set[ipaddress.IPv4Address] = set()
+    public_keys: set[str] = set()
+    hub_count = 0
+    for index, raw_node in enumerate(nodes_value):
+        label = f"nodes[{index}]"
+        node = _require_object(raw_node, label)
+        _require_exact_fields(node, V2_NODE_FIELDS, label, optional={"hub_transport"})
+        node_id = _validate_node_id(node["id"], f"{label}.id")
+        if node_id in node_ids:
+            raise MeshError(f"node id {node_id!r} is duplicated")
+        node_ids.add(node_id)
+
+        role = _require_string(node["role"], f"{label}.role")
+        if role not in {"hub", "leaf"}:
+            raise MeshError(f"{label}.role must be hub or leaf")
+        if role == "hub":
+            hub_count += 1
+        platform = _require_string(node["platform"], f"{label}.platform")
+        if platform not in SUPPORTED_PLATFORMS:
+            raise MeshError(
+                f"{label}.platform must be one of {', '.join(sorted(SUPPORTED_PLATFORMS))}"
+            )
+        address = _validate_node_address(node["address"], label=label, role=role, overlay=overlay)
+        if address in node_addresses:
+            raise MeshError(f"node address {address} is duplicated")
+        node_addresses.add(address)
+
+        public_key = _require_string(node["public_key"], f"{label}.public_key")
+        _decode_wireguard_key(public_key, f"{label}.public_key")
+        if public_key in public_keys:
+            raise MeshError("node public keys must be unique")
+        public_keys.add(public_key)
+
+        transport: dict[str, str] | None = None
+        if "hub_transport" in node:
+            if role != "leaf":
+                raise MeshError("the hub must not declare hub_transport")
+            transport = _parse_hub_transport(
+                node["hub_transport"], f"{label}.hub_transport", overlay, listen_port
+            )
+        if role == "leaf" and transport is None:
+            raise MeshError("every leaf requires exactly one hub_transport")
+
+        normalized_node: dict[str, Any] = {
+            "id": node_id,
+            "role": role,
+            "platform": platform,
+            "address": f"{address}/32",
+            "public_key": public_key,
+        }
+        if transport is not None:
+            normalized_node["hub_transport"] = transport
+        normalized_nodes.append(normalized_node)
+
+    if hub_count != 1:
+        raise MeshError("an active mesh requires exactly one hub")
+    normalized_nodes.sort(key=lambda item: item["id"])
+    hub = next(node for node in normalized_nodes if node["role"] == "hub")
+    if peer_transit and hub["platform"] != "linux":
+        raise MeshError("mesh.peer_transit requires a Linux hub")
+    egress = _validate_egress(root["egress"], nodes=normalized_nodes)
+    if peer_transit and egress["mode"] == "nord-vpn":
+        raise MeshError("nord-vpn egress currently requires mesh.peer_transit to remain false")
+    return {
+        "schema_version": PERMANENT_SCHEMA_VERSION,
+        "generation": generation,
+        "mesh": {
+            "name": mesh_name,
+            "subnet": str(overlay),
+            "listen_port": listen_port,
+            "peer_transit": peer_transit,
+        },
+        "failover_mode": "manual-static",
+        "cutover_epoch": cutover_epoch,
+        "expires_at": expires_at,
+        "rotate_at": rotate_at,
+        "egress": egress,
+        "nodes": normalized_nodes,
+    }
+
+
 def _migrate_v1_to_v2(document: dict[str, Any], *, now: dt.datetime) -> dict[str, Any]:
     if document["generation"] == 0:
         migrated = {
@@ -776,19 +965,27 @@ def _migrate_v1_to_v2(document: dict[str, Any], *, now: dt.datetime) -> dict[str
 
 
 def validate_document(document: Any, *, now: dt.datetime | None = None) -> dict[str, Any]:
-    """Validate a schema-v2 document or normalize a legacy v1 document to v2."""
+    """Validate a mesh document.
+
+    A schema-v2 document is validated in place; a legacy v1 document is
+    normalized to v2; a schema-v3 (permanent) document is validated as v3 and
+    kept as v3 (v3 is opt-in and is never produced by migration).
+    """
 
     now = now or dt.datetime.now(dt.timezone.utc)
     root = _require_object(document, "document")
+    supported = ", ".join(str(version) for version in SUPPORTED_SCHEMA_VERSIONS)
     version = root.get("schema_version")
     if isinstance(version, bool) or not isinstance(version, int):
-        raise MeshError(f"schema_version must be {LEGACY_SCHEMA_VERSION} or {SCHEMA_VERSION}")
+        raise MeshError(f"schema_version must be one of {supported}")
     if version == LEGACY_SCHEMA_VERSION:
         legacy = _validate_v1_document(root, now=now)
         return _migrate_v1_to_v2(legacy, now=now)
     if version == SCHEMA_VERSION:
         return _validate_v2_document(root, now=now)
-    raise MeshError(f"schema_version must be {LEGACY_SCHEMA_VERSION} or {SCHEMA_VERSION}")
+    if version == PERMANENT_SCHEMA_VERSION:
+        return _validate_v3_document(root, now=now)
+    raise MeshError(f"schema_version must be one of {supported}")
 
 
 def _absolute(path: Path) -> Path:
@@ -963,7 +1160,7 @@ def load_document_with_source(path: Path) -> tuple[dict[str, Any], int]:
     document = _load_json_document(path)
     source_version = document.get("schema_version")
     normalized = validate_document(document)
-    assert source_version in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+    assert source_version in SUPPORTED_SCHEMA_VERSIONS
     return normalized, source_version
 
 
@@ -1225,10 +1422,11 @@ def _build_mesh_binding(document: dict[str, Any]) -> dict[str, Any]:
         json.dumps(document, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).hexdigest()
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": document["schema_version"],
         "generation": document["generation"],
         "cutover_epoch": document["cutover_epoch"],
         "expires_at": document["expires_at"],
+        "rotate_at": document.get("rotate_at"),
         "document_sha256": document_sha256,
         "mesh_name": document["mesh"]["name"],
         "mesh_subnet": document["mesh"]["subnet"],
@@ -1314,7 +1512,7 @@ def _render_manifest(document: dict[str, Any], node: dict[str, Any], config_name
     authorized_leaf_ids = mesh_binding["authorized_leaf_ids"]
     authorized_source_addresses = mesh_binding["authorized_source_addresses"]
     manifest = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": document["schema_version"],
         "generation": document["generation"],
         "mesh_name": document["mesh"]["name"],
         "node_id": node["id"],
@@ -1323,6 +1521,7 @@ def _render_manifest(document: dict[str, Any], node: dict[str, Any], config_name
         "failover_mode": document["failover_mode"],
         "cutover_epoch": document["cutover_epoch"],
         "expires_at": document["expires_at"],
+        "rotate_at": document.get("rotate_at"),
         "peer_ids": [peer["id"] for peer in peers],
         "allowed_ips": _allowed_ips_for_node(document, node),
         "node_platform": node["platform"],
@@ -1428,7 +1627,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     file=sys.stderr,
                 )
             state = "inert" if document["generation"] == 0 else "active"
-            print(f"valid schema-v2 mesh config ({state}, generation {document['generation']})")
+            lifetime = ""
+            if document["schema_version"] == PERMANENT_SCHEMA_VERSION and state == "active":
+                horizon = "permanent" if document["expires_at"] is None else document["expires_at"]
+                rotate = document.get("rotate_at") or "unscheduled"
+                lifetime = f", lifetime {horizon}, rotation {rotate}"
+            print(
+                f"valid schema-v{document['schema_version']} mesh config "
+                f"({state}, generation {document['generation']}{lifetime})"
+            )
         elif args.command == "generate-key":
             node_id = _validate_node_id(args.node_id)
             private_path = args.private_key_file or _default_private_key_path(node_id)
