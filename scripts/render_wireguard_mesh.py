@@ -931,12 +931,15 @@ def _validate_fencing(value: Any) -> dict[str, str]:
     fencing = _require_object(value, "fencing")
     _require_exact_fields(fencing, FENCING_FIELDS, "fencing")
     source = _require_string(fencing["source"], "fencing.source")
-    if source != "differential":
-        raise MeshError("fencing.source must be differential")
+    # The tracked schema names only the generic lease kind; the concrete lease
+    # provider, its endpoint, and credentials are resolved at activation from an
+    # ignored local config, so no private component is named in this public repo.
+    if source != "acid-lease":
+        raise MeshError("fencing.source must be acid-lease")
     lease_id = _require_string(fencing["lease_id"], "fencing.lease_id")
     if not LEASE_ID_RE.fullmatch(lease_id):
         raise MeshError(f"fencing.lease_id must match {LEASE_ID_RE.pattern}")
-    return {"source": "differential", "lease_id": lease_id}
+    return {"source": "acid-lease", "lease_id": lease_id}
 
 
 def _validate_hub_group(
