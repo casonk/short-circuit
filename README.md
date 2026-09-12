@@ -70,6 +70,13 @@ This repo lives under:
   cannot go split-brain. Speaks only a generic `http-acid-lease` contract; the
   concrete provider, endpoint, and mTLS identity live in an owner-only,
   git-ignored config (`config/wireguard/fencing.local.json`)
+- `scripts/hub_activation_guard.sh`: reconciles the shared dual-hub WireGuard
+  identity to the fence — fence held → `wg-quick up` + refresh the client DNS;
+  fence not held → `wg-quick down`. Idempotent and fail-closed (any non-holder
+  result tears the interface down), so the shared identity never runs on two
+  hosts at once. Run periodically by the watchdog units in `config/systemd/`
+  (Linux hub) or `config/launchd/` (macOS hub); it acquires within one tick of
+  winning the fence and releases within one tick of losing it
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
   profile with an existing temporary-mesh peer plus disjoint canonical service
   peers; it never enables transit or selects an application writer

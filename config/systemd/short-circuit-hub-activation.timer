@@ -1,0 +1,14 @@
+# Runs the activation guard shortly after boot and every 30s thereafter, so the
+# host acquires the shared hub identity within ~30s of winning the fence and
+# releases it within ~30s of losing it. Tune OnUnitActiveSec to trade failover
+# latency against lease-check/DDNS request volume.
+[Unit]
+Description=Periodically reconcile the short-circuit dual-hub WireGuard identity to the fence
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=30s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
