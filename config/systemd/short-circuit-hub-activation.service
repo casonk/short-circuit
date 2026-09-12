@@ -1,0 +1,13 @@
+# short-circuit dual-hub WireGuard activation guard (Linux hub).
+# Install: adjust the paths, drop this + the .timer into /etc/systemd/system/,
+# create the EnvironmentFile, then: systemctl enable --now short-circuit-hub-activation.timer
+[Unit]
+Description=short-circuit dual-hub WireGuard activation guard (fence reconciler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Set HUB_INTERFACE, LEASE_CHECK_COMMAND, and (optional) DDNS_UPDATE_COMMAND here.
+EnvironmentFile=/etc/short-circuit/hub-activation.env
+ExecStart=/usr/bin/env bash /opt/short-circuit/scripts/hub_activation_guard.sh
