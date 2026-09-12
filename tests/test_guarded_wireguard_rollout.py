@@ -87,6 +87,16 @@ def test_apply_extracts_candidate_peers_and_arms_systemd_guard(tmp_path: Path) -
         encoding="utf-8",
     )
     _write_fake_bin(fake_bin, "wg", "#!/usr/bin/env bash\nexit 0\n")
+    # Freeze time so APPLY_EPOCH (captured at apply) and the later `date +%s`
+    # read in remaining_timeout_seconds() land in the same second. Without this
+    # the armed guard is `--on-active=<1800 minus elapsed>s`, and the exact
+    # 1800s assertion below fails whenever a 1-second tick falls between them.
+    _write_fake_bin(
+        fake_bin,
+        "date",
+        '#!/usr/bin/env bash\n'
+        'if [[ "$1" == "+%s" ]]; then echo 1700000000; else echo 20231114T000000; fi\n',
+    )
     _write_fake_bin(
         fake_bin,
         "systemctl",
