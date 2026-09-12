@@ -738,10 +738,14 @@ else:
         self.assertEqual(len(primaries), 1)
         self.assertEqual(normalized["fencing"], {"source": "differential", "lease_id": "mesh-hub"})
 
-        # Rendering/binding is deferred to the next slice and must fail loudly,
-        # not silently emit a broken config.
-        with self.assertRaisesRegex(mesh.MeshError, "schema v4"):
-            mesh.build_mesh_binding(document)
+        # The dual-hub binding reflects the shared identity + fencing.
+        binding = mesh.build_mesh_binding(document)
+        self.assertEqual(binding["schema_version"], 4)
+        self.assertEqual(binding["hub_primary_host_id"], "linux")
+        self.assertEqual(binding["fencing"], {"source": "differential", "lease_id": "mesh-hub"})
+        self.assertEqual(
+            [b["node_id"] for b in binding["wireguard_peer_bindings"]], ["leaf-mini", "leaf-pro"]
+        )
 
         rejects = {
             "two primaries": lambda d: d["hub_group"]["hosts"][1].__setitem__("role", "primary"),
@@ -788,6 +792,86 @@ else:
         with_group["hub_group"] = dualhub_document()["hub_group"]
         with self.assertRaisesRegex(mesh.MeshError, "inert"):
             mesh.validate_document(with_group)
+
+    def test_v4_render_shares_hub_identity_and_leaf_imports_once(self) -> None:
+        document_dict = dualhub_document()
+        # Keys the fake wg knows: hub identity = PUBLIC_A, one leaf = PUBLIC_B.
+        document_dict["hub_group"]["virtual_public_key"] = PUBLIC_A
+        document_dict["nodes"] = [
+            {
+                "id": "leaf-mini",
+                "role": "leaf",
+                "platform": "ios",
+                "address": "10.99.0.241/32",
+                "public_key": PUBLIC_B,
+            }
+        ]
+        config = self.write_json("mesh.local.json", document_dict)
+        hub_key = self.write_key("linux.key", PRIVATE_A)  # the shared hub key
+        leaf_key = self.write_key("leaf-mini.key", PRIVATE_B)
+        with mock.patch.dict(os.environ, self.environment, clear=True):
+            document = mesh.load_document(config)
+            linux_conf, linux_manifest = mesh.render(
+                document=document,
+                node_id="linux",
+                private_key_path=hub_key,
+                output_dir=self.root / "linux",
+                wg_binary=os.fspath(self.fake_wg),
+            )
+            air_conf, air_manifest = mesh.render(
+                document=document,
+                node_id="air",
+                private_key_path=hub_key,
+                output_dir=self.root / "air",
+                wg_binary=os.fspath(self.fake_wg),
+            )
+            leaf_conf, leaf_manifest = mesh.render(
+                document=document,
+                node_id="leaf-mini",
+                private_key_path=leaf_key,
+                output_dir=self.root / "leaf",
+                wg_binary=os.fspath(self.fake_wg),
+            )
+
+        linux_text = linux_conf.read_text(encoding="utf-8")
+        # Both hub hosts share the one virtual identity -> byte-identical configs.
+        self.assertEqual(linux_text, air_conf.read_text(encoding="utf-8"))
+        iface, peers = parse_wg_quick(linux_text)
+        self.assertEqual(iface["Address"], "10.99.0.254/32")
+        self.assertEqual(iface["PrivateKey"], PRIVATE_A)
+        self.assertEqual(len(peers), 1)
+        self.assertEqual(peers[0]["PublicKey"], PUBLIC_B)
+        self.assertEqual(peers[0]["AllowedIPs"], "10.99.0.241/32")
+
+        # The leaf peers only with the virtual hub, at the single client endpoint.
+        leaf_iface, leaf_peers = parse_wg_quick(leaf_conf.read_text(encoding="utf-8"))
+        self.assertEqual(leaf_iface["Address"], "10.99.0.241/32")
+        self.assertEqual(len(leaf_peers), 1)
+        self.assertEqual(leaf_peers[0]["PublicKey"], PUBLIC_A)
+        self.assertEqual(leaf_peers[0]["AllowedIPs"], "10.99.0.254/32")
+        self.assertEqual(leaf_peers[0]["Endpoint"], "mesh.example.com:51821")
+        self.assertEqual(leaf_peers[0]["PersistentKeepalive"], "25")
+
+        # Manifests: hub hosts declare the fencing lease + their role, no key.
+        linux_man = json.loads(linux_manifest.read_text(encoding="utf-8"))
+        air_man = json.loads(air_manifest.read_text(encoding="utf-8"))
+        self.assertEqual(linux_man["node_role"], "hub-host")
+        self.assertEqual(linux_man["hub_role"], "primary")
+        self.assertEqual(air_man["hub_role"], "standby")
+        self.assertTrue(air_man["is_standby"])
+        self.assertEqual(linux_man["requires_active_lease"], "mesh-hub")
+        self.assertEqual(linux_man["fencing_source"], "differential")
+        self.assertFalse(linux_man["private_key_in_manifest"])
+        self.assertNotIn(PRIVATE_A, linux_manifest.read_text(encoding="utf-8"))
+
+        leaf_man = json.loads(leaf_manifest.read_text(encoding="utf-8"))
+        self.assertEqual(leaf_man["node_role"], "leaf")
+        self.assertEqual(leaf_man["endpoint"], "mesh.example.com:51821")
+        self.assertIsNone(leaf_man["requires_active_lease"])
+
+        # Outputs are owner-only.
+        self.assertEqual(stat.S_IMODE(linux_conf.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(leaf_conf.stat().st_mode), 0o600)
 
     def test_default_render_paths_are_generation_scoped(self) -> None:
         config_dir = self.root / "config" / "wireguard"
