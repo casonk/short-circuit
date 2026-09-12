@@ -48,8 +48,9 @@ This repo lives under:
   key-rotation horizon; schema v4 adds a **dual-hub** mesh — a shared virtual
   hub identity (one keypair/address/endpoint) hosted by a primary plus
   standbys, with `leased-active-standby` failover fenced by a named lease so
-  exactly one host is active. v4 validation ships now; its rendering and the
-  lease-enforcing activation land in follow-up changes
+  exactly one host is active. v4 validation and rendering ship now (each host
+  manifest declares its `requires_active_lease`); enforcing that lease at
+  activation lands with the differential integration
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
@@ -356,9 +357,11 @@ identity, a leaf imports one stable profile and never re-imports on failover; th
 client endpoint is a DNS name a DDNS updater keeps pointed at the active host.
 Split-brain is prevented by fencing: `failover_mode` is `leased-active-standby`
 and a `fencing` block names the lease (`source: differential`) whose holder is
-the sole host allowed to activate. The renderer stays render-only — it validates
-and will declare the lease requirement in each host manifest; enforcing the lease
-at activation is a separate, differential-integrated step. nord egress and
+the sole host allowed to activate. The renderer stays render-only: it emits each
+hub host's config (all hosts share the one virtual identity, so their profiles
+are byte-identical) and a leaf profile that never changes on failover, and it
+declares `requires_active_lease` in each host manifest; enforcing that lease at
+activation is a separate, differential-integrated step. nord egress and
 `peer_transit` are not yet supported under v4. See
 `config/wireguard/mesh.dualhub.example.json`.
 `Persistent=true` covers a missed timer deadline after downtime, and the startup
