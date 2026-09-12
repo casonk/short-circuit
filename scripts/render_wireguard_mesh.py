@@ -28,7 +28,13 @@ from typing import Any
 SCHEMA_VERSION = 2
 LEGACY_SCHEMA_VERSION = 1
 PERMANENT_SCHEMA_VERSION = 3
-SUPPORTED_SCHEMA_VERSIONS = (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION, PERMANENT_SCHEMA_VERSION)
+DUALHUB_SCHEMA_VERSION = 4
+SUPPORTED_SCHEMA_VERSIONS = (
+    LEGACY_SCHEMA_VERSION,
+    SCHEMA_VERSION,
+    PERMANENT_SCHEMA_VERSION,
+    DUALHUB_SCHEMA_VERSION,
+)
 DEFAULT_CONFIG = Path("config/wireguard/mesh.local.json")
 DEFAULT_STATE_ROOT = Path("config/wireguard/mesh.local.d")
 MAX_CONFIG_BYTES = 1024 * 1024
@@ -68,6 +74,23 @@ V1_TOP_LEVEL_FIELDS = {
 }
 V2_TOP_LEVEL_FIELDS = V1_TOP_LEVEL_FIELDS | {"egress"}
 V3_TOP_LEVEL_FIELDS = V2_TOP_LEVEL_FIELDS | {"rotate_at"}
+# Schema v4 replaces the single hub node with a shared-identity hub_group (one
+# virtual keypair/address/endpoint hosted by a primary + standbys) and adds a
+# fencing block that names the lease which elects the sole active host.
+V4_TOP_LEVEL_FIELDS = V3_TOP_LEVEL_FIELDS | {"hub_group", "fencing"}
+V4_LEAF_FIELDS = {"id", "role", "platform", "address", "public_key"}
+HUB_GROUP_FIELDS = {
+    "virtual_public_key",
+    "virtual_address",
+    "client_transport_mode",
+    "client_endpoint",
+    "primary_host_id",
+    "hosts",
+}
+HUB_HOST_FIELDS = {"id", "platform", "underlay_endpoint", "role"}
+FENCING_FIELDS = {"source", "lease_id"}
+LEASE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+MAX_HUB_HOSTS = 4
 V1_MESH_FIELDS = {"name", "subnet", "listen_port"}
 V2_MESH_FIELDS = V1_MESH_FIELDS | {"peer_transit"}
 V1_NODE_FIELDS = {"id", "role", "address", "public_key", "underlay_endpoint"}
@@ -904,6 +927,239 @@ def _validate_v3_document(document: Any, *, now: dt.datetime) -> dict[str, Any]:
     }
 
 
+def _validate_fencing(value: Any) -> dict[str, str]:
+    fencing = _require_object(value, "fencing")
+    _require_exact_fields(fencing, FENCING_FIELDS, "fencing")
+    source = _require_string(fencing["source"], "fencing.source")
+    if source != "differential":
+        raise MeshError("fencing.source must be differential")
+    lease_id = _require_string(fencing["lease_id"], "fencing.lease_id")
+    if not LEASE_ID_RE.fullmatch(lease_id):
+        raise MeshError(f"fencing.lease_id must match {LEASE_ID_RE.pattern}")
+    return {"source": "differential", "lease_id": lease_id}
+
+
+def _validate_hub_group(
+    value: Any, *, overlay: ipaddress.IPv4Network, listen_port: int
+) -> dict[str, Any]:
+    group = _require_object(value, "hub_group")
+    _require_exact_fields(group, HUB_GROUP_FIELDS, "hub_group")
+    virtual_public_key = _require_string(
+        group["virtual_public_key"], "hub_group.virtual_public_key"
+    )
+    _decode_wireguard_key(virtual_public_key, "hub_group.virtual_public_key")
+    virtual_address = _validate_node_address(
+        group["virtual_address"], label="hub_group", role="hub", overlay=overlay
+    )
+    mode = _require_string(group["client_transport_mode"], "hub_group.client_transport_mode")
+    if mode not in {"direct", "opaque-udp-relay"}:
+        raise MeshError("hub_group.client_transport_mode must be direct or opaque-udp-relay")
+    # The client-facing endpoint is shared by every leaf ("import once"); reuse
+    # the leaf transport endpoint rules for the selected mode.
+    transport = _parse_hub_transport(
+        {"mode": mode, "endpoint": group["client_endpoint"]},
+        "hub_group.client_endpoint",
+        overlay,
+        listen_port,
+    )
+    primary_host_id = _validate_node_id(group["primary_host_id"], "hub_group.primary_host_id")
+
+    hosts_value = group["hosts"]
+    if not isinstance(hosts_value, list) or not 1 <= len(hosts_value) <= MAX_HUB_HOSTS:
+        raise MeshError(f"hub_group.hosts must contain one through {MAX_HUB_HOSTS} entries")
+    hosts: list[dict[str, str]] = []
+    host_ids: set[str] = set()
+    underlays: set[str] = set()
+    primary_count = 0
+    for index, raw_host in enumerate(hosts_value):
+        label = f"hub_group.hosts[{index}]"
+        host = _require_object(raw_host, label)
+        _require_exact_fields(host, HUB_HOST_FIELDS, label)
+        host_id = _validate_node_id(host["id"], f"{label}.id")
+        if host_id in host_ids:
+            raise MeshError(f"hub host id {host_id!r} is duplicated")
+        host_ids.add(host_id)
+        platform = _require_string(host["platform"], f"{label}.platform")
+        if platform not in SUPPORTED_PLATFORMS:
+            raise MeshError(
+                f"{label}.platform must be one of {', '.join(sorted(SUPPORTED_PLATFORMS))}"
+            )
+        underlay = _parse_underlay_endpoint(
+            host["underlay_endpoint"], f"{label}.underlay_endpoint", overlay, listen_port
+        )
+        if underlay in underlays:
+            raise MeshError(f"hub host underlay endpoint {underlay} is duplicated")
+        underlays.add(underlay)
+        role = _require_string(host["role"], f"{label}.role")
+        if role not in {"primary", "standby"}:
+            raise MeshError(f"{label}.role must be primary or standby")
+        if role == "primary":
+            primary_count += 1
+        hosts.append(
+            {"id": host_id, "platform": platform, "underlay_endpoint": underlay, "role": role}
+        )
+
+    if primary_count != 1:
+        raise MeshError("hub_group requires exactly one primary host")
+    if primary_host_id not in host_ids:
+        raise MeshError("hub_group.primary_host_id must identify a declared host")
+    if next(host for host in hosts if host["id"] == primary_host_id)["role"] != "primary":
+        raise MeshError("hub_group.primary_host_id must reference the primary host")
+    hosts.sort(key=lambda host: host["id"])
+    return {
+        "virtual_public_key": virtual_public_key,
+        "virtual_address": f"{virtual_address}/32",
+        "client_transport_mode": transport["mode"],
+        "client_endpoint": transport["endpoint"],
+        "primary_host_id": primary_host_id,
+        "hosts": hosts,
+    }
+
+
+def _validate_v4_document(document: Any, *, now: dt.datetime) -> dict[str, Any]:
+    """Validate a schema-v4 (dual-hub) mesh document.
+
+    v4 replaces the single hub node with a shared-identity hub_group: one virtual
+    keypair/address/endpoint hosted by exactly one primary plus optional
+    standbys. Only the host holding the fencing lease may activate, so the hosts
+    share one WireGuard identity and leaves import a single, stable profile. v4
+    is permanent-lifetime like v3; nord egress and peer_transit are out of scope
+    for this slice.
+    """
+    root = _require_object(document, "document")
+    _require_exact_fields(root, V4_TOP_LEVEL_FIELDS, "document")
+    if root["schema_version"] != DUALHUB_SCHEMA_VERSION:
+        raise MeshError(f"schema_version must be {DUALHUB_SCHEMA_VERSION}")
+    generation = _require_int(root["generation"], "generation", minimum=0)
+    mesh_name, overlay, listen_port, peer_transit = _validate_mesh_identity(
+        root["mesh"], fields=V2_MESH_FIELDS, include_peer_transit=True
+    )
+    if root["failover_mode"] != "leased-active-standby":
+        raise MeshError("failover_mode must be leased-active-standby")
+    cutover_epoch = _require_int(root["cutover_epoch"], "cutover_epoch", minimum=0)
+    nodes_value = root["nodes"]
+    if not isinstance(nodes_value, list):
+        raise MeshError("nodes must be a JSON array")
+
+    if generation == 0:
+        egress = _validate_egress(root["egress"], nodes=[])
+        if (
+            cutover_epoch != 0
+            or root["expires_at"] is not None
+            or root["rotate_at"] is not None
+            or root["hub_group"] is not None
+            or root["fencing"] is not None
+            or nodes_value
+            or peer_transit
+            or egress["mode"] != "disabled"
+        ):
+            raise MeshError(
+                "generation 0 must be inert: epoch 0, null expiry/rotation, no hub_group, "
+                "no fencing, no nodes, no transit, and no egress"
+            )
+        return {
+            "schema_version": DUALHUB_SCHEMA_VERSION,
+            "generation": 0,
+            "mesh": {
+                "name": mesh_name,
+                "subnet": str(overlay),
+                "listen_port": listen_port,
+                "peer_transit": False,
+            },
+            "failover_mode": "leased-active-standby",
+            "cutover_epoch": 0,
+            "expires_at": None,
+            "rotate_at": None,
+            "fencing": None,
+            "hub_group": None,
+            "egress": egress,
+            "nodes": [],
+        }
+
+    if peer_transit:
+        raise MeshError("schema v4 does not yet support mesh.peer_transit")
+    if cutover_epoch < 1:
+        raise MeshError("an active generation requires cutover_epoch of 1 or greater")
+    expires_at = _parse_expiry(root["expires_at"], now=now, allow_null=True, max_lifetime=None)
+    rotate_at = _parse_rotate_at(root["rotate_at"], now=now)
+    fencing = _validate_fencing(root["fencing"])
+    hub_group = _validate_hub_group(root["hub_group"], overlay=overlay, listen_port=listen_port)
+    egress = _validate_egress(root["egress"], nodes=[])
+    if egress["mode"] != "disabled":
+        raise MeshError("schema v4 requires egress.mode to be disabled for now")
+    if not nodes_value:
+        raise MeshError("an active mesh requires at least one leaf")
+
+    hub_key = hub_group["virtual_public_key"]
+    hub_address = hub_group["virtual_address"]
+    host_ids = {host["id"] for host in hub_group["hosts"]}
+    normalized_nodes: list[dict[str, Any]] = []
+    node_ids: set[str] = set()
+    node_addresses: set[str] = set()
+    public_keys: set[str] = {hub_key}
+    for index, raw_node in enumerate(nodes_value):
+        label = f"nodes[{index}]"
+        node = _require_object(raw_node, label)
+        _require_exact_fields(node, V4_LEAF_FIELDS, label)
+        node_id = _validate_node_id(node["id"], f"{label}.id")
+        if node_id in node_ids:
+            raise MeshError(f"node id {node_id!r} is duplicated")
+        if node_id in host_ids:
+            raise MeshError(f"leaf id {node_id!r} collides with a hub host id")
+        node_ids.add(node_id)
+
+        role = _require_string(node["role"], f"{label}.role")
+        if role != "leaf":
+            raise MeshError(f"{label}.role must be leaf (the hub is the hub_group)")
+        platform = _require_string(node["platform"], f"{label}.platform")
+        if platform not in SUPPORTED_PLATFORMS:
+            raise MeshError(
+                f"{label}.platform must be one of {', '.join(sorted(SUPPORTED_PLATFORMS))}"
+            )
+        address = _validate_node_address(node["address"], label=label, role="leaf", overlay=overlay)
+        if f"{address}/32" in node_addresses:
+            raise MeshError(f"node address {address} is duplicated")
+        node_addresses.add(f"{address}/32")
+
+        public_key = _require_string(node["public_key"], f"{label}.public_key")
+        _decode_wireguard_key(public_key, f"{label}.public_key")
+        if public_key in public_keys:
+            raise MeshError("node public keys must be unique and differ from the hub identity")
+        public_keys.add(public_key)
+
+        normalized_nodes.append(
+            {
+                "id": node_id,
+                "role": "leaf",
+                "platform": platform,
+                "address": f"{address}/32",
+                "public_key": public_key,
+            }
+        )
+
+    if hub_address in node_addresses:
+        raise MeshError("a leaf must not use the virtual hub address")
+    normalized_nodes.sort(key=lambda item: item["id"])
+    return {
+        "schema_version": DUALHUB_SCHEMA_VERSION,
+        "generation": generation,
+        "mesh": {
+            "name": mesh_name,
+            "subnet": str(overlay),
+            "listen_port": listen_port,
+            "peer_transit": False,
+        },
+        "failover_mode": "leased-active-standby",
+        "cutover_epoch": cutover_epoch,
+        "expires_at": expires_at,
+        "rotate_at": rotate_at,
+        "fencing": fencing,
+        "hub_group": hub_group,
+        "egress": egress,
+        "nodes": normalized_nodes,
+    }
+
+
 def _migrate_v1_to_v2(document: dict[str, Any], *, now: dt.datetime) -> dict[str, Any]:
     if document["generation"] == 0:
         migrated = {
@@ -985,6 +1241,8 @@ def validate_document(document: Any, *, now: dt.datetime | None = None) -> dict[
         return _validate_v2_document(root, now=now)
     if version == PERMANENT_SCHEMA_VERSION:
         return _validate_v3_document(root, now=now)
+    if version == DUALHUB_SCHEMA_VERSION:
+        return _validate_v4_document(root, now=now)
     raise MeshError(f"schema_version must be one of {supported}")
 
 
@@ -1391,6 +1649,10 @@ def _allowed_ips_for_node(document: dict[str, Any], node: dict[str, Any]) -> lis
 
 def _build_mesh_binding(document: dict[str, Any]) -> dict[str, Any]:
     """Build the canonical, key-free identity shared with dependent renderers."""
+    if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
+        raise MeshError(
+            "schema v4 (dual-hub) binding/rendering is implemented in the next change"
+        )
     nodes_by_id = {item["id"]: item for item in document["nodes"]}
     authorized_leaf_ids = (
         document["egress"]["authorized_leaf_ids"]
@@ -1556,6 +1818,10 @@ def render(
 ) -> tuple[Path, Path]:
     node_id = _validate_node_id(node_id)
     document = validate_document(document)
+    if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
+        raise MeshError(
+            "schema v4 (dual-hub) rendering is implemented in the next change"
+        )
     if document["generation"] == 0:
         raise MeshError("generation 0 is inert and cannot be rendered")
     node = _select_node(document, node_id)
@@ -1627,14 +1893,24 @@ def main(argv: Sequence[str] | None = None) -> int:
                     file=sys.stderr,
                 )
             state = "inert" if document["generation"] == 0 else "active"
-            lifetime = ""
-            if document["schema_version"] == PERMANENT_SCHEMA_VERSION and state == "active":
+            detail = ""
+            permanent_versions = {PERMANENT_SCHEMA_VERSION, DUALHUB_SCHEMA_VERSION}
+            if document["schema_version"] in permanent_versions and state == "active":
                 horizon = "permanent" if document["expires_at"] is None else document["expires_at"]
                 rotate = document.get("rotate_at") or "unscheduled"
-                lifetime = f", lifetime {horizon}, rotation {rotate}"
+                detail = f", lifetime {horizon}, rotation {rotate}"
+            if document["schema_version"] == DUALHUB_SCHEMA_VERSION and state == "active":
+                hosts = document["hub_group"]["hosts"]
+                primary = document["hub_group"]["primary_host_id"]
+                standbys = [host["id"] for host in hosts if host["role"] == "standby"]
+                detail += (
+                    f", hub primary {primary}, standby {','.join(standbys) or 'none'}, "
+                    f"fenced by {document['fencing']['source']} lease "
+                    f"{document['fencing']['lease_id']}"
+                )
             print(
                 f"valid schema-v{document['schema_version']} mesh config "
-                f"({state}, generation {document['generation']}{lifetime})"
+                f"({state}, generation {document['generation']}{detail})"
             )
         elif args.command == "generate-key":
             node_id = _validate_node_id(args.node_id)

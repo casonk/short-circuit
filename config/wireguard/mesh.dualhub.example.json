@@ -1,0 +1,52 @@
+{
+  "schema_version": 4,
+  "generation": 1,
+  "mesh": {
+    "name": "home-dualhub-mesh",
+    "subnet": "10.99.0.240/28",
+    "listen_port": 51821,
+    "peer_transit": false
+  },
+  "failover_mode": "leased-active-standby",
+  "cutover_epoch": 1,
+  "expires_at": null,
+  "rotate_at": null,
+  "fencing": {
+    "source": "differential",
+    "lease_id": "mesh-hub"
+  },
+  "hub_group": {
+    "virtual_public_key": "ERERERERERERERERERERERERERERERERERERERERERE=",
+    "virtual_address": "10.99.0.254/32",
+    "client_transport_mode": "direct",
+    "client_endpoint": "mesh.example.com:51821",
+    "primary_host_id": "linux-hub",
+    "hosts": [
+      {
+        "id": "linux-hub",
+        "platform": "linux",
+        "underlay_endpoint": "192.168.0.10:51821",
+        "role": "primary"
+      },
+      {
+        "id": "air-hub",
+        "platform": "macos",
+        "underlay_endpoint": "192.168.0.3:51821",
+        "role": "standby"
+      }
+    ]
+  },
+  "egress": {
+    "mode": "disabled",
+    "gateway_node_id": null
+  },
+  "nodes": [
+    {
+      "id": "phone",
+      "role": "leaf",
+      "platform": "ios",
+      "address": "10.99.0.241/32",
+      "public_key": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+    }
+  ]
+}
