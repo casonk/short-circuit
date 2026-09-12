@@ -12,7 +12,7 @@
   "expires_at": null,
   "rotate_at": null,
   "fencing": {
-    "source": "differential",
+    "source": "acid-lease",
     "lease_id": "mesh-hub"
   },
   "hub_group": {
