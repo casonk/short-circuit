@@ -17,6 +17,8 @@ config/wireguard/roaming-policy.local.json
 config/wireguard/access-bundle.local.json
 config/wireguard/ddns.local.json
 config/wireguard/ddns.local.state
+config/wireguard/fencing.local.json
+config/wireguard/fencing.local.d/
 config/wireguard/mesh.local.d/
 
 # Editor and OS noise
