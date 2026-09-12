@@ -142,6 +142,63 @@ def permanent_document() -> dict[str, object]:
     return document
 
 
+def dualhub_document() -> dict[str, object]:
+    """A schema-v4 dual-hub mesh: one shared virtual identity, lease-fenced."""
+    return {
+        "schema_version": 4,
+        "generation": 5,
+        "mesh": {
+            "name": "home-dualhub",
+            "subnet": "10.99.0.240/28",
+            "listen_port": 51821,
+            "peer_transit": False,
+        },
+        "failover_mode": "leased-active-standby",
+        "cutover_epoch": 2,
+        "expires_at": None,
+        "rotate_at": None,
+        "fencing": {"source": "differential", "lease_id": "mesh-hub"},
+        "hub_group": {
+            "virtual_public_key": PUBLIC_A,
+            "virtual_address": "10.99.0.254/32",
+            "client_transport_mode": "direct",
+            "client_endpoint": "mesh.example.com:51821",
+            "primary_host_id": "linux",
+            "hosts": [
+                {
+                    "id": "linux",
+                    "platform": "linux",
+                    "underlay_endpoint": "192.168.0.10:51821",
+                    "role": "primary",
+                },
+                {
+                    "id": "air",
+                    "platform": "macos",
+                    "underlay_endpoint": "192.168.0.3:51821",
+                    "role": "standby",
+                },
+            ],
+        },
+        "egress": {"mode": "disabled", "gateway_node_id": None},
+        "nodes": [
+            {
+                "id": "leaf-mini",
+                "role": "leaf",
+                "platform": "ios",
+                "address": "10.99.0.241/32",
+                "public_key": PUBLIC_B,
+            },
+            {
+                "id": "leaf-pro",
+                "role": "leaf",
+                "platform": "ios",
+                "address": "10.99.0.242/32",
+                "public_key": PUBLIC_C,
+            },
+        ],
+    }
+
+
 def parse_wg_quick(text: str) -> tuple[dict[str, str], list[dict[str, str]]]:
     interface: dict[str, str] | None = None
     peers: list[dict[str, str]] = []
@@ -669,6 +726,68 @@ else:
         rotating_inert["rotate_at"] = ROTATION_HORIZON
         with self.assertRaisesRegex(mesh.MeshError, "inert"):
             mesh.validate_document(rotating_inert)
+
+    def test_schema_v4_dualhub_shared_identity_and_fencing(self) -> None:
+        document = dualhub_document()
+        normalized = mesh.validate_document(document)
+        self.assertEqual(normalized["schema_version"], 4)
+        self.assertEqual(normalized["failover_mode"], "leased-active-standby")
+        self.assertIsNone(normalized["expires_at"])  # permanent, like v3
+        # Exactly one primary; the hosts share one virtual identity.
+        primaries = [h for h in normalized["hub_group"]["hosts"] if h["role"] == "primary"]
+        self.assertEqual(len(primaries), 1)
+        self.assertEqual(normalized["fencing"], {"source": "differential", "lease_id": "mesh-hub"})
+
+        # Rendering/binding is deferred to the next slice and must fail loudly,
+        # not silently emit a broken config.
+        with self.assertRaisesRegex(mesh.MeshError, "schema v4"):
+            mesh.build_mesh_binding(document)
+
+        rejects = {
+            "two primaries": lambda d: d["hub_group"]["hosts"][1].__setitem__("role", "primary"),
+            "missing fencing": lambda d: d.__setitem__("fencing", None),
+            "bad fencing source": lambda d: d["fencing"].__setitem__("source", "file"),
+            "leaf reuses hub key": lambda d: d["nodes"][0].__setitem__("public_key", PUBLIC_A),
+            "leaf id collides with host": lambda d: d["nodes"][0].__setitem__("id", "linux"),
+            "nord egress rejected": lambda d: d["egress"].__setitem__("mode", "nord-vpn"),
+            "peer transit rejected": lambda d: d["mesh"].__setitem__("peer_transit", True),
+            "leaf role must be leaf": lambda d: d["nodes"][0].__setitem__("role", "hub"),
+            "primary id mismatch": lambda d: d["hub_group"].__setitem__("primary_host_id", "air"),
+            "duplicate host underlay": lambda d: d["hub_group"]["hosts"][1].__setitem__(
+                "underlay_endpoint", "192.168.0.10:51821"
+            ),
+        }
+        for name, mutate in rejects.items():
+            with self.subTest(reject=name):
+                candidate = copy.deepcopy(document)
+                mutate(candidate)
+                with self.assertRaises(mesh.MeshError):
+                    mesh.validate_document(candidate)
+
+    def test_schema_v4_generation_zero_stays_inert(self) -> None:
+        inert = {
+            "schema_version": 4,
+            "generation": 0,
+            "mesh": {
+                "name": "home-dualhub",
+                "subnet": "10.99.0.240/28",
+                "listen_port": 51821,
+                "peer_transit": False,
+            },
+            "failover_mode": "leased-active-standby",
+            "cutover_epoch": 0,
+            "expires_at": None,
+            "rotate_at": None,
+            "fencing": None,
+            "hub_group": None,
+            "egress": {"mode": "disabled", "gateway_node_id": None},
+            "nodes": [],
+        }
+        self.assertEqual(mesh.validate_document(inert)["schema_version"], 4)
+        with_group = copy.deepcopy(inert)
+        with_group["hub_group"] = dualhub_document()["hub_group"]
+        with self.assertRaisesRegex(mesh.MeshError, "inert"):
+            mesh.validate_document(with_group)
 
     def test_default_render_paths_are_generation_scoped(self) -> None:
         config_dir = self.root / "config" / "wireguard"
