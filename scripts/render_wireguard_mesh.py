@@ -1650,9 +1650,7 @@ def _allowed_ips_for_node(document: dict[str, Any], node: dict[str, Any]) -> lis
 def _build_mesh_binding(document: dict[str, Any]) -> dict[str, Any]:
     """Build the canonical, key-free identity shared with dependent renderers."""
     if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
-        raise MeshError(
-            "schema v4 (dual-hub) binding/rendering is implemented in the next change"
-        )
+        return _build_v4_binding(document)
     nodes_by_id = {item["id"]: item for item in document["nodes"]}
     authorized_leaf_ids = (
         document["egress"]["authorized_leaf_ids"]
@@ -1808,6 +1806,161 @@ def _render_manifest(document: dict[str, Any], node: dict[str, Any], config_name
     return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
 
 
+def _select_v4_target(document: dict[str, Any], node_id: str) -> dict[str, Any]:
+    hub_group = document["hub_group"]
+    for host in hub_group["hosts"]:
+        if host["id"] == node_id:
+            return {
+                "kind": "hub-host",
+                "host": host,
+                "public_key": hub_group["virtual_public_key"],
+                "address": hub_group["virtual_address"],
+            }
+    for node in document["nodes"]:
+        if node["id"] == node_id:
+            return {
+                "kind": "leaf",
+                "node": node,
+                "public_key": node["public_key"],
+                "address": node["address"],
+            }
+    raise MeshError(f"node id {node_id!r} is not present in the mesh document")
+
+
+def _build_v4_binding(document: dict[str, Any]) -> dict[str, Any]:
+    """Key-free canonical binding for a dual-hub (schema v4) mesh."""
+    hub_group = document["hub_group"]
+    leaf_bindings = sorted(
+        (
+            {"node_id": node["id"], "address": node["address"], "public_key": node["public_key"]}
+            for node in document["nodes"]
+        ),
+        key=lambda item: item["node_id"],
+    )
+    document_sha256 = hashlib.sha256(
+        json.dumps(document, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return {
+        "schema_version": DUALHUB_SCHEMA_VERSION,
+        "generation": document["generation"],
+        "cutover_epoch": document["cutover_epoch"],
+        "expires_at": document["expires_at"],
+        "rotate_at": document["rotate_at"],
+        "document_sha256": document_sha256,
+        "mesh_name": document["mesh"]["name"],
+        "mesh_subnet": document["mesh"]["subnet"],
+        "peer_transit": document["mesh"]["peer_transit"],
+        "failover_mode": document["failover_mode"],
+        "fencing": dict(document["fencing"]),
+        "hub_virtual_public_key": hub_group["virtual_public_key"],
+        "hub_virtual_address": hub_group["virtual_address"],
+        "hub_client_endpoint": hub_group["client_endpoint"],
+        "hub_client_transport_mode": hub_group["client_transport_mode"],
+        "hub_primary_host_id": hub_group["primary_host_id"],
+        "hub_hosts": [dict(host) for host in hub_group["hosts"]],
+        "wireguard_peer_bindings": leaf_bindings,
+    }
+
+
+def _render_v4_wg_quick(document: dict[str, Any], target: dict[str, Any], private_key: str) -> str:
+    hub_group = document["hub_group"]
+    listen_port = document["mesh"]["listen_port"]
+    lines = [
+        "# Render-only WireGuard mesh profile.",
+        "# Importing or running wg-quick is a separate, explicit operation.",
+        "# This profile does not enable forwarding, NAT, or firewall changes.",
+        "[Interface]",
+        f"PrivateKey = {private_key}",
+        f"Address = {target['address']}",
+        f"ListenPort = {listen_port}",
+    ]
+    if target["kind"] == "hub-host":
+        # Every hub host shares the one virtual identity; its peers are the leaves.
+        for leaf in document["nodes"]:
+            lines.extend(
+                [
+                    "",
+                    "[Peer]",
+                    f"# Node = {leaf['id']}",
+                    f"PublicKey = {leaf['public_key']}",
+                    f"AllowedIPs = {leaf['address']}",
+                ]
+            )
+    else:
+        # A leaf peers only with the shared virtual hub, reached at the single
+        # client endpoint regardless of which host is currently active.
+        lines.extend(
+            [
+                "",
+                "[Peer]",
+                "# Hub = shared virtual identity",
+                f"PublicKey = {hub_group['virtual_public_key']}",
+                f"AllowedIPs = {hub_group['virtual_address']}",
+                f"Endpoint = {hub_group['client_endpoint']}",
+                "PersistentKeepalive = 25",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _render_v4_manifest(document: dict[str, Any], target: dict[str, Any], config_name: str) -> str:
+    hub_group = document["hub_group"]
+    fencing = document["fencing"]
+    common: dict[str, Any] = {
+        "schema_version": DUALHUB_SCHEMA_VERSION,
+        "generation": document["generation"],
+        "mesh_name": document["mesh"]["name"],
+        "config_file": config_name,
+        "failover_mode": document["failover_mode"],
+        "cutover_epoch": document["cutover_epoch"],
+        "expires_at": document["expires_at"],
+        "rotate_at": document["rotate_at"],
+        "fencing_source": fencing["source"],
+        "fencing_lease_id": fencing["lease_id"],
+        "hub_client_endpoint": hub_group["client_endpoint"],
+        "hub_client_transport_mode": hub_group["client_transport_mode"],
+        "hub_virtual_address": hub_group["virtual_address"],
+        "mesh_binding": _build_v4_binding(document),
+        "activation_performed": False,
+        "routing_changed": False,
+        "forwarding_enabled": False,
+        "nat_configured": False,
+        "private_key_in_manifest": False,
+    }
+    if target["kind"] == "hub-host":
+        host = target["host"]
+        manifest = {
+            **common,
+            "node_id": host["id"],
+            "node_role": "hub-host",
+            "hub_role": host["role"],
+            "node_platform": host["platform"],
+            "underlay_endpoint": host["underlay_endpoint"],
+            "peer_ids": [leaf["id"] for leaf in document["nodes"]],
+            "allowed_ips": [leaf["address"] for leaf in document["nodes"]],
+            # A hub host must not activate wg unless it holds the fencing lease.
+            # The renderer only declares this; activation tooling enforces it.
+            "requires_active_lease": fencing["lease_id"],
+            "is_standby": host["role"] == "standby",
+            "peer_hub_host_ids": [
+                other["id"] for other in hub_group["hosts"] if other["id"] != host["id"]
+            ],
+        }
+    else:
+        leaf = target["node"]
+        manifest = {
+            **common,
+            "node_id": leaf["id"],
+            "node_role": "leaf",
+            "node_platform": leaf["platform"],
+            "peer_ids": ["hub-virtual"],
+            "allowed_ips": [hub_group["virtual_address"]],
+            "endpoint": hub_group["client_endpoint"],
+            "requires_active_lease": None,
+        }
+    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+
+
 def render(
     *,
     document: dict[str, Any],
@@ -1818,16 +1971,18 @@ def render(
 ) -> tuple[Path, Path]:
     node_id = _validate_node_id(node_id)
     document = validate_document(document)
-    if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
-        raise MeshError(
-            "schema v4 (dual-hub) rendering is implemented in the next change"
-        )
     if document["generation"] == 0:
         raise MeshError("generation 0 is inert and cannot be rendered")
-    node = _select_node(document, node_id)
+
+    if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
+        target = _select_v4_target(document, node_id)
+        expected_public_key = target["public_key"]
+    else:
+        target = _select_node(document, node_id)
+        expected_public_key = target["public_key"]
     private_key = _read_private_key(private_key_path)
     derived_public_key = _run_wg(wg_binary, "pubkey", private_key=private_key)
-    if derived_public_key != node["public_key"]:
+    if derived_public_key != expected_public_key:
         raise MeshError("the private key does not match the selected node's configured public key")
 
     output_absolute = _absolute(output_dir)
@@ -1837,8 +1992,12 @@ def render(
     _assert_target_available(config_path)
     _assert_target_available(manifest_path)
 
-    config = _render_wg_quick(document, node, private_key).encode("utf-8")
-    manifest = _render_manifest(document, node, config_path.name).encode("utf-8")
+    if document["schema_version"] == DUALHUB_SCHEMA_VERSION:
+        config = _render_v4_wg_quick(document, target, private_key).encode("utf-8")
+        manifest = _render_v4_manifest(document, target, config_path.name).encode("utf-8")
+    else:
+        config = _render_wg_quick(document, target, private_key).encode("utf-8")
+        manifest = _render_manifest(document, target, config_path.name).encode("utf-8")
     config_created: Path | None = None
     try:
         config_created = _write_owner_only_new(config_path, config)
