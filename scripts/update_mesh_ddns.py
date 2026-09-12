@@ -10,9 +10,11 @@ changed.
 Design constraints, matching the rest of this repo:
   * stdlib only (urllib), no third-party dependencies;
   * the config is an owner-only, git-ignored local file (it carries an API
-    token) that glovebox distributes; nothing secret is tracked;
+    token) distributed by the portfolio's encrypted config store; nothing
+    secret is tracked;
   * it must run only on the *active* hub. Enforcement of "am I active" is the
-    fencing lease (differential); until that lands, pass --check-active-command
+    acid-lease fence (provider named only in local config); until that lands,
+    pass --check-active-command
     with the command that exits 0 only on the lease holder, and wire this into
     the post-activation path. Without it the updater assumes the caller already
     fenced.

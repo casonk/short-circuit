@@ -50,7 +50,8 @@ This repo lives under:
   standbys, with `leased-active-standby` failover fenced by a named lease so
   exactly one host is active. v4 validation and rendering ship now (each host
   manifest declares its `requires_active_lease`); enforcing that lease at
-  activation lands with the differential integration
+  activation lands with the `acid-lease` provider (resolved from ignored local
+  config)
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
 - `scripts/update_mesh_ddns.py`: keeps the dual-hub `client_endpoint` DNS name
@@ -58,7 +59,7 @@ This repo lives under:
   change. Owner-only, git-ignored config (`config/wireguard/ddns.local.json`);
   Cloudflare or a generic update URL; `--dry-run` reports without publishing and
   `--check-active-command` gates it to the active hub (the fencing seam for the
-  differential lease). Unlike the mesh/roaming renderers this makes a real DNS
+  `acid-lease` fence). Unlike the mesh/roaming renderers this makes a real DNS
   change, so it runs on the active hub's post-activation path, not at render time
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
   profile with an existing temporary-mesh peer plus disjoint canonical service
@@ -363,12 +364,13 @@ client-facing `client_endpoint` that every leaf uses) hosted by exactly one
 identity, a leaf imports one stable profile and never re-imports on failover; the
 client endpoint is a DNS name a DDNS updater keeps pointed at the active host.
 Split-brain is prevented by fencing: `failover_mode` is `leased-active-standby`
-and a `fencing` block names the lease (`source: differential`) whose holder is
-the sole host allowed to activate. The renderer stays render-only: it emits each
-hub host's config (all hosts share the one virtual identity, so their profiles
-are byte-identical) and a leaf profile that never changes on failover, and it
-declares `requires_active_lease` in each host manifest; enforcing that lease at
-activation is a separate, differential-integrated step. nord egress and
+and a `fencing` block names the lease kind (`source: acid-lease`) whose holder is
+the sole host allowed to activate. The concrete lease provider is named only in
+ignored local config, never in this repo. The renderer stays render-only: it
+emits each hub host's config (all hosts share the one virtual identity, so their
+profiles are byte-identical) and a leaf profile that never changes on failover,
+and it declares `requires_active_lease` in each host manifest; enforcing that
+lease at activation is a separate operational step. nord egress and
 `peer_transit` are not yet supported under v4. See
 `config/wireguard/mesh.dualhub.example.json`.
 `Persistent=true` covers a missed timer deadline after downtime, and the startup
