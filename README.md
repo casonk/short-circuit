@@ -61,6 +61,15 @@ This repo lives under:
   `--check-active-command` gates it to the active hub (the fencing seam for the
   `acid-lease` fence). Unlike the mesh/roaming renderers this makes a real DNS
   change, so it runs on the active hub's post-activation path, not at render time
+- `scripts/check_active_lease.py`: answers "is this host the active hub?" by
+  checking the ACID fencing lease — exit 0 iff this node holds a healthy, fenced
+  lease for its `lease_id`, else non-zero. It is the concrete `acid-lease` check
+  behind the v4 manifest's `requires_active_lease` and the DDNS updater's
+  `--check-active-command`. Fail-closed: any error, unhealthy quorum, missing
+  fence, or a different holder resolves to "not active", so a shared hub identity
+  cannot go split-brain. Speaks only a generic `http-acid-lease` contract; the
+  concrete provider, endpoint, and mTLS identity live in an owner-only,
+  git-ignored config (`config/wireguard/fencing.local.json`)
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
   profile with an existing temporary-mesh peer plus disjoint canonical service
   peers; it never enables transit or selects an application writer

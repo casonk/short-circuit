@@ -1,0 +1,14 @@
+{
+  "lease_id": "mesh-hub",
+  "node_id": "linux-hub",
+  "provider": {
+    "kind": "http-acid-lease",
+    "url": "https://10.99.0.254:9443",
+    "timeout_seconds": 5,
+    "tls": {
+      "cert": "config/wireguard/fencing.local.d/client.crt",
+      "key": "config/wireguard/fencing.local.d/client.key",
+      "ca": "config/wireguard/fencing.local.d/ca.crt"
+    }
+  }
+}
