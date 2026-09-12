@@ -53,6 +53,13 @@ This repo lives under:
   activation lands with the differential integration
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
+- `scripts/update_mesh_ddns.py`: keeps the dual-hub `client_endpoint` DNS name
+  pointed at the active hub's public IP so leaves never re-import on a WAN-IP
+  change. Owner-only, git-ignored config (`config/wireguard/ddns.local.json`);
+  Cloudflare or a generic update URL; `--dry-run` reports without publishing and
+  `--check-active-command` gates it to the active hub (the fencing seam for the
+  differential lease). Unlike the mesh/roaming renderers this makes a real DNS
+  change, so it runs on the active hub's post-activation path, not at render time
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
   profile with an existing temporary-mesh peer plus disjoint canonical service
   peers; it never enables transit or selects an application writer

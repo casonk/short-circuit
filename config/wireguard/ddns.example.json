@@ -1,0 +1,9 @@
+{
+  "fqdn": "mesh.example.com",
+  "provider": "generic-url",
+  "record_type": "A",
+  "ttl": 60,
+  "ip_source": "https://api.ipify.org",
+  "url_template": "https://dyndns.example.com/nic/update?hostname=mesh.example.com&myip={ip}",
+  "state_file": "config/wireguard/ddns.local.state"
+}
