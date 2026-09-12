@@ -41,8 +41,11 @@ This repo lives under:
   peer reconnects
 - `scripts/check_wireguard_edge.sh`: read-only edge preflight that reports
   the required router UDP forward for the host's current LAN address
-- `scripts/render_wireguard_mesh.py`: fail-closed schema-v2 recovery-mesh
-  renderer with schema-v1 in-memory compatibility
+- `scripts/render_wireguard_mesh.py`: fail-closed recovery-mesh renderer.
+  Schema v2 (with schema-v1 in-memory compatibility) is the temporary,
+  ≤31-day recovery mesh; schema v3 adds a **permanent** mesh (`expires_at`
+  may be null — no implicit expiry) with an optional `rotate_at` scheduled
+  key-rotation horizon
 - `scripts/render_roaming_policy.py`: mesh-bound, key-free roaming coverage
   validator and decision-plan renderer; it performs no endpoint switching
 - `scripts/render_wireguard_access_bundle.py`: renders one replacement mobile
@@ -331,6 +334,15 @@ expiry timer. The timer is `BindsTo`/`PartOf` WireGuard without reverse
 WireGuard starts. It fires at the exact bound UTC deadline, and its non-manually-
 startable stop service stops the `wg-quick@` unit. The route then disappears
 through its WireGuard binding while the terminal guard remains.
+
+A **schema-v3 permanent mesh** sets `expires_at` to null and therefore installs
+no expiry timer — the tunnel is not fenced to a deadline. Instead of an implicit
+death it names an explicit rotation horizon: the optional `rotate_at` (a UTC
+timestamp capped at ~13 months) records when the next coordinated key rotation
+is due. `rotate_at` is planning metadata surfaced in the manifest and binding,
+not a runtime kill switch; the rotation itself is a deliberate re-key, analogous
+to renewing a time-bound certificate. A permanent mesh that still sets an
+explicit far-future `expires_at` keeps the enforced fence at that date.
 `Persistent=true` covers a missed timer deadline after downtime, and the startup
 gate independently rejects an already expired generation.
 

@@ -1,0 +1,38 @@
+{
+  "schema_version": 3,
+  "generation": 1,
+  "mesh": {
+    "name": "home-permanent-mesh",
+    "subnet": "10.99.0.240/28",
+    "listen_port": 51821,
+    "peer_transit": false
+  },
+  "failover_mode": "manual-static",
+  "cutover_epoch": 1,
+  "expires_at": null,
+  "rotate_at": null,
+  "egress": {
+    "mode": "disabled",
+    "gateway_node_id": null
+  },
+  "nodes": [
+    {
+      "id": "linux-hub",
+      "role": "hub",
+      "platform": "linux",
+      "address": "10.99.0.254/32",
+      "public_key": "ERERERERERERERERERERERERERERERERERERERERERE="
+    },
+    {
+      "id": "phone",
+      "role": "leaf",
+      "platform": "ios",
+      "address": "10.99.0.241/32",
+      "public_key": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+      "hub_transport": {
+        "mode": "direct",
+        "endpoint": "mesh.example.com:51821"
+      }
+    }
+  ]
+}
