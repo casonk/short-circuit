@@ -157,7 +157,7 @@ def dualhub_document() -> dict[str, object]:
         "cutover_epoch": 2,
         "expires_at": None,
         "rotate_at": None,
-        "fencing": {"source": "differential", "lease_id": "mesh-hub"},
+        "fencing": {"source": "acid-lease", "lease_id": "mesh-hub"},
         "hub_group": {
             "virtual_public_key": PUBLIC_A,
             "virtual_address": "10.99.0.254/32",
@@ -736,13 +736,13 @@ else:
         # Exactly one primary; the hosts share one virtual identity.
         primaries = [h for h in normalized["hub_group"]["hosts"] if h["role"] == "primary"]
         self.assertEqual(len(primaries), 1)
-        self.assertEqual(normalized["fencing"], {"source": "differential", "lease_id": "mesh-hub"})
+        self.assertEqual(normalized["fencing"], {"source": "acid-lease", "lease_id": "mesh-hub"})
 
         # The dual-hub binding reflects the shared identity + fencing.
         binding = mesh.build_mesh_binding(document)
         self.assertEqual(binding["schema_version"], 4)
         self.assertEqual(binding["hub_primary_host_id"], "linux")
-        self.assertEqual(binding["fencing"], {"source": "differential", "lease_id": "mesh-hub"})
+        self.assertEqual(binding["fencing"], {"source": "acid-lease", "lease_id": "mesh-hub"})
         self.assertEqual(
             [b["node_id"] for b in binding["wireguard_peer_bindings"]], ["leaf-mini", "leaf-pro"]
         )
@@ -860,7 +860,7 @@ else:
         self.assertEqual(air_man["hub_role"], "standby")
         self.assertTrue(air_man["is_standby"])
         self.assertEqual(linux_man["requires_active_lease"], "mesh-hub")
-        self.assertEqual(linux_man["fencing_source"], "differential")
+        self.assertEqual(linux_man["fencing_source"], "acid-lease")
         self.assertFalse(linux_man["private_key_in_manifest"])
         self.assertNotIn(PRIVATE_A, linux_manifest.read_text(encoding="utf-8"))
 
