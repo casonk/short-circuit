@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- short-circuit dual-hub WireGuard activation guard (macOS hub, e.g. Air).
+     Install: adjust paths + env, place in /Library/LaunchDaemons/, then:
+     sudo launchctl bootstrap system /Library/LaunchDaemons/com.short-circuit.hub-activation.plist -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.short-circuit.hub-activation</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/opt/short-circuit/scripts/hub_activation_guard.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HUB_INTERFACE</key><string>wg0</string>
+    <key>LEASE_CHECK_COMMAND</key><string>/opt/short-circuit/scripts/check_active_lease.py --quiet</string>
+    <key>DDNS_UPDATE_COMMAND</key><string>/opt/short-circuit/scripts/update_mesh_ddns.py</string>
+  </dict>
+  <key>StartInterval</key><integer>30</integer>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
