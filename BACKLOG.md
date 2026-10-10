@@ -10,6 +10,14 @@ Mark items `[x]` when complete and move them to Done.
 
 ## Pending
 
+- [ ] [manual:2026-10-10] Build and independently test a supported double-VPN
+  topology for a macOS WireGuard client without concurrently composing macOS
+  Network Extension VPNs. Prefer a separately managed Linux router/VM that
+  carries the encrypted WireGuard UDP transport through NordVPN, while the
+  remote WireGuard gateway retains its own NordVPN egress. Keep relay ingress
+  loopback-only, allow only the reviewed UDP endpoint through the relay,
+  fail closed if either Nord layer disappears, and test handshake, DNS, IPv4,
+  IPv6 non-fallback, external egress, restart, and teardown before promotion.
 - [ ] [manual:2026-08-09] Provision and independently test one stable
   public/direct or opaque UDP relay endpoint plus Air's supervised outbound
   relay client before promoting the roaming policy from `audit-only` to
