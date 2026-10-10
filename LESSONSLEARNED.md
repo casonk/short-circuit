@@ -54,6 +54,12 @@
   underlay and overlay. When an existing private mesh tunnel must remain active,
   use a separately reviewed command-line `wireguard-go`/`wg-quick` session with
   narrow host routes, or move routed hub duties to native Linux.
+- A full-tunnel inner WireGuard route can cause the macOS Nord Network
+  Extension to reassert its own policy and detach the command-line `utun`
+  interface moments after setup. Treat a live initial interface and route-add
+  success as insufficient; verify sustained route selection and handshakes, and
+  move the outer Nord layer to a Linux router/VM for a supported full-tunnel
+  design.
 - Prove that every selected leaf can keep the private underlay and command-line
   WireGuard overlay active simultaneously. An app-only client is not a valid
   recovery peer merely because it supports each VPN separately, and the inner
