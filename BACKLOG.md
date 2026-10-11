@@ -10,6 +10,14 @@ Mark items `[x]` when complete and move them to Done.
 
 ## Pending
 
+- [ ] [manual:2026-10-11] **Prepare step for a listen-port change** — The guarded
+  rollout now owns the live switch and the firewalld rule, but the candidate
+  config and the client profiles are still edited by hand. Add a non-root
+  helper that takes a required `--new-port`, writes a candidate server config,
+  rewrites the `Endpoint` port in the ignored local client profiles with a
+  backup beside them, and re-exports QR artifacts. It must not touch the live
+  host; the output feeds `guarded_wireguard_rollout.sh --apply --public-zone`.
+
 - [ ] [manual:2026-10-10] Build and independently test a supported double-VPN
   topology for a macOS WireGuard client without concurrently composing macOS
   Network Extension VPNs. Prefer a separately managed Linux router/VM that
