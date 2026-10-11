@@ -10,6 +10,21 @@ Mark items `[x]` when complete and move them to Done.
 
 ## Pending
 
+- [ ] [manual:2026-10-11] **Ask GitHub Support to purge pre-rewrite history** — `main`
+  was rewritten on 2026-10-11 to remove a home public IPv4 address and a live WireGuard listen port from
+  every commit. GitHub still serves the old commits to anyone who has a hash,
+  and through the read-only `refs/pull/*` refs of earlier pull requests, until
+  Support removes them. Open a ticket at <https://support.github.com/request>
+  ("remove sensitive data"): name this repository, give the old and new `main`
+  hashes, and ask for the unreachable commits to be garbage-collected, cached
+  views cleared, and the affected pull-request refs and diffs removed. The
+  hashes are recorded locally, outside git, in
+  `~/.local/share/portfolio-backups/history-rewrite-20261011/` on the Fedora
+  desktop; do not paste them or the removed values into a public issue. After
+  Support confirms, check that an old hash returns 404, then delete the local
+  pre-rewrite bundles. Every other clone must re-clone or hard-reset to
+  `origin/main` and must not push its old history back.
+
 - [ ] [manual:2026-10-11] **Prepare step for a listen-port change** — The guarded
   rollout now owns the live switch and the firewalld rule, but the candidate
   config and the client profiles are still edited by hand. Add a non-root
