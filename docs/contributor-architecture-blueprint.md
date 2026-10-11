@@ -101,6 +101,12 @@ config before returning. The `--arm-guard` mode rehydrates pending metadata to
 schedule the same timestamp-bound guard when an apply succeeded but timer
 creation failed.
 
+When the candidate changes `ListenPort` and `--public-zone` is given, the same
+state machine owns the host firewall rule: the new UDP port is opened before
+the listener moves, the old one is removed only on a proven handshake, and a
+rollback removes the new port if the rollout added it. The firewall fields
+live in the same owner-only metadata file as the rollout status.
+
 ### scripts/render_wireguard_mesh.py
 
 A fail-closed, render-only tool for the temporary topology. Schema v2 validates

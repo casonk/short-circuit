@@ -14,6 +14,11 @@ REQUIRED_PEERS=()
 CANDIDATE_PATH=""
 APPLY_EPOCH=""
 STATUS=""
+PUBLIC_ZONE=""
+FIREWALL_ZONE=""
+FIREWALL_OLD_PORT=""
+FIREWALL_NEW_PORT=""
+FIREWALL_NEW_PORT_ADDED="0"
 
 usage() {
   cat <<'USAGE'
@@ -42,7 +47,17 @@ Options:
   --require-all-peers     Require every selected peer instead of any one peer.
   --wait-inline           Wait in this process instead of only arming systemd.
   --no-schedule           Do not arm the systemd transient rollback check.
+  --public-zone ZONE      Manage the UDP listen port in this firewalld zone when
+                          the candidate changes ListenPort (see below).
   --help                  Show this help.
+
+Listen-port changes: when the candidate's ListenPort differs from the active
+config and --public-zone is given, --apply opens the new UDP port in that zone
+before switching. The old port stays open until a required peer completes a
+fresh handshake; only then is it removed. A rollback removes the new port again
+if this rollout added it. Without --public-zone the host firewall is left
+alone and a warning is printed. Router port-forwards are never managed here:
+forward both ports until the rollout has succeeded.
 
 Default --apply behavior arms a root systemd transient check. Use
 --wait-inline only when a supervising terminal or service will remain alive.
@@ -86,6 +101,15 @@ validate_positive_int() {
 
   [[ "${value}" =~ ^[0-9]+$ ]] || fail "${label} must be a positive integer"
   (( 10#${value} > 0 )) || fail "${label} must be a positive integer"
+}
+
+validate_zone() {
+  [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || fail "invalid firewalld zone: $1"
+}
+
+validate_port() {
+  [[ "$1" =~ ^[0-9]+$ ]] || fail "invalid ListenPort: $1"
+  (( 10#$1 >= 1 && 10#$1 <= 65535 )) || fail "ListenPort out of range: $1"
 }
 
 validate_public_key() {
@@ -168,6 +192,118 @@ extract_candidate_peers() {
   ' "${source_path}"
 }
 
+extract_listen_port() {
+  local source_path="$1"
+  awk '
+    BEGIN { in_interface = 0 }
+    /^[[:space:]]*\[Interface\][[:space:]]*$/ { in_interface = 1; next }
+    /^[[:space:]]*\[/ { in_interface = 0; next }
+    in_interface && /^[[:space:]]*ListenPort[[:space:]]*=/ {
+      sub(/^[^=]*=[[:space:]]*/, "", $0)
+      sub(/[[:space:]]*(#.*)?$/, "", $0)
+      print $0
+      exit
+    }
+  ' "${source_path}"
+}
+
+# The permanent configuration is the authority for "is this port allowed":
+# it is what survives a reload or reboot, and what a later rollback must leave
+# exactly as it found it.
+firewall_port_open() {
+  firewall-cmd --permanent --zone="$1" --query-port="$2/udp" >/dev/null 2>&1
+}
+
+# Change permanent and runtime state separately instead of `--reload`. A
+# reload re-applies every zone and can drop the session this is run over.
+firewall_add_port() {
+  firewall-cmd --permanent --zone="$1" --add-port="$2/udp" >/dev/null &&
+    firewall-cmd --zone="$1" --add-port="$2/udp" >/dev/null
+}
+
+firewall_remove_port() {
+  firewall-cmd --permanent --zone="$1" --remove-port="$2/udp" >/dev/null &&
+    firewall-cmd --zone="$1" --remove-port="$2/udp" >/dev/null
+}
+
+plan_firewall_port_change() {
+  local old_port
+  local new_port
+
+  FIREWALL_ZONE=""
+  FIREWALL_OLD_PORT=""
+  FIREWALL_NEW_PORT=""
+  FIREWALL_NEW_PORT_ADDED="0"
+  old_port="$(extract_listen_port "${CONFIG_PATH}")"
+  new_port="$(extract_listen_port "${CANDIDATE_PATH}")"
+  if [[ -z "${old_port}" || -z "${new_port}" || "${old_port}" == "${new_port}" ]]; then
+    return 0
+  fi
+  validate_port "${old_port}"
+  validate_port "${new_port}"
+  if [[ -z "${PUBLIC_ZONE}" ]]; then
+    log "warning: ListenPort changes ${old_port} -> ${new_port} but --public-zone was not given; the host firewall is not managed by this rollout"
+    return 0
+  fi
+  require_command firewall-cmd
+  FIREWALL_ZONE="${PUBLIC_ZONE}"
+  FIREWALL_OLD_PORT="${old_port}"
+  FIREWALL_NEW_PORT="${new_port}"
+  if ! firewall_port_open "${FIREWALL_ZONE}" "${FIREWALL_NEW_PORT}"; then
+    FIREWALL_NEW_PORT_ADDED="1"
+  fi
+}
+
+open_new_firewall_port() {
+  [[ -n "${FIREWALL_ZONE}" ]] || return 0
+  if [[ "${FIREWALL_NEW_PORT_ADDED}" == "1" ]]; then
+    # Called from an `if`, where errexit is off: fail explicitly.
+    firewall_add_port "${FIREWALL_ZONE}" "${FIREWALL_NEW_PORT}" || return 1
+    log "opened udp/${FIREWALL_NEW_PORT} in firewalld zone ${FIREWALL_ZONE}"
+  else
+    log "firewalld zone ${FIREWALL_ZONE} already allows udp/${FIREWALL_NEW_PORT}"
+  fi
+  log "udp/${FIREWALL_OLD_PORT} stays open until a required peer handshakes on the new port"
+}
+
+# Only ever called after a fresh handshake has proven the new port works.
+close_old_firewall_port() {
+  [[ -n "${FIREWALL_ZONE}" ]] || return 0
+  if ! command -v firewall-cmd >/dev/null 2>&1; then
+    log "warning: firewall-cmd not found; remove udp/${FIREWALL_OLD_PORT} from zone ${FIREWALL_ZONE} manually"
+    return 0
+  fi
+  if firewall_port_open "${FIREWALL_ZONE}" "${FIREWALL_OLD_PORT}"; then
+    if firewall_remove_port "${FIREWALL_ZONE}" "${FIREWALL_OLD_PORT}"; then
+      log "removed old udp/${FIREWALL_OLD_PORT} from firewalld zone ${FIREWALL_ZONE}"
+    else
+      log "warning: could not remove udp/${FIREWALL_OLD_PORT} from zone ${FIREWALL_ZONE}; remove it manually"
+    fi
+  fi
+}
+
+# Undo only what this rollout added, so a rollback leaves the firewall as it
+# was found. The old port was never touched, so there is nothing to restore.
+revert_new_firewall_port() {
+  [[ -n "${FIREWALL_ZONE}" && "${FIREWALL_NEW_PORT_ADDED}" == "1" ]] || return 0
+  if ! command -v firewall-cmd >/dev/null 2>&1; then
+    log "warning: firewall-cmd not found; remove udp/${FIREWALL_NEW_PORT} from zone ${FIREWALL_ZONE} manually"
+    return 0
+  fi
+  if firewall_remove_port "${FIREWALL_ZONE}" "${FIREWALL_NEW_PORT}"; then
+    log "removed udp/${FIREWALL_NEW_PORT} from firewalld zone ${FIREWALL_ZONE}"
+  else
+    log "warning: could not remove udp/${FIREWALL_NEW_PORT} from zone ${FIREWALL_ZONE}; remove it manually"
+  fi
+}
+
+write_firewall_metadata() {
+  printf 'FIREWALL_ZONE=%q\n' "${FIREWALL_ZONE}"
+  printf 'FIREWALL_OLD_PORT=%q\n' "${FIREWALL_OLD_PORT}"
+  printf 'FIREWALL_NEW_PORT=%q\n' "${FIREWALL_NEW_PORT}"
+  printf 'FIREWALL_NEW_PORT_ADDED=%q\n' "${FIREWALL_NEW_PORT_ADDED}"
+}
+
 join_peers_for_state() {
   local peer
   local joined=""
@@ -199,6 +335,7 @@ write_metadata() {
     printf 'TIMEOUT_SECONDS=%q\n' "${TIMEOUT_SECONDS}"
     printf 'REQUIRE_ALL_PEERS=%q\n' "${REQUIRE_ALL_PEERS}"
     printf 'REQUIRED_PEERS=%q\n' "$(join_peers_for_state)"
+    write_firewall_metadata
     printf 'STATUS=%q\n' "pending"
   } > "${temp_file}"
   chmod 0600 "${temp_file}"
@@ -221,9 +358,22 @@ load_metadata() {
       fail "metadata must be owned by root: ${metadata}"
   fi
   (( (8#${mode} & 8#022) == 0 )) || fail "metadata must not be group- or world-writable"
+  # Metadata written before listen-port handling existed has no firewall
+  # fields; clear them first so a value from the command line cannot leak in.
+  FIREWALL_ZONE=""
+  FIREWALL_OLD_PORT=""
+  FIREWALL_NEW_PORT=""
+  FIREWALL_NEW_PORT_ADDED="0"
   # shellcheck source=/dev/null
   source "${metadata}"
   [[ "${STATE_VERSION:-}" == "1" ]] || fail "unsupported metadata version"
+  if [[ -n "${FIREWALL_ZONE}" ]]; then
+    validate_zone "${FIREWALL_ZONE}"
+    validate_port "${FIREWALL_OLD_PORT}"
+    validate_port "${FIREWALL_NEW_PORT}"
+    [[ "${FIREWALL_NEW_PORT_ADDED}" == "0" || "${FIREWALL_NEW_PORT_ADDED}" == "1" ]] ||
+      fail "invalid FIREWALL_NEW_PORT_ADDED in metadata"
+  fi
   validate_name "${INTERFACE}"
   validate_positive_int "timeout seconds" "${TIMEOUT_SECONDS}"
   [[ "${REQUIRE_ALL_PEERS}" == "0" || "${REQUIRE_ALL_PEERS}" == "1" ]] ||
@@ -254,6 +404,7 @@ write_status() {
     printf 'TIMEOUT_SECONDS=%q\n' "${TIMEOUT_SECONDS}"
     printf 'REQUIRE_ALL_PEERS=%q\n' "${REQUIRE_ALL_PEERS}"
     printf 'REQUIRED_PEERS=%q\n' "$(join_peers_for_state)"
+    write_firewall_metadata
     printf 'STATUS=%q\n' "${status}"
   } > "${temp_file}"
   chmod 0600 "${temp_file}"
@@ -374,16 +525,25 @@ apply_rollout() {
     fi
     archive_rollout_state
   fi
+  plan_firewall_port_change
   cp -p "${CONFIG_PATH}" "$(previous_config_path)"
   cp -p "${CANDIDATE_PATH}" "$(candidate_config_path)"
   chmod 0600 "$(previous_config_path)" "$(candidate_config_path)"
   write_metadata
+
+  # The new port must be reachable before the listener moves to it, and the
+  # change is recorded first so a rollback knows what to undo.
+  if ! open_new_firewall_port; then
+    write_status "failed-firewall"
+    fail "could not open udp/${FIREWALL_NEW_PORT} in firewalld zone ${FIREWALL_ZONE}; config not changed"
+  fi
 
   install -m 0600 "$(candidate_config_path)" "${CONFIG_PATH}"
   if ! restart_wireguard; then
     log "candidate restart failed; restoring previous config"
     restore_previous_config
     restart_wireguard
+    revert_new_firewall_port
     write_status "failed-rolled-back"
     fail "candidate config failed to restart wg-quick@${INTERFACE}.service; previous config restored"
   fi
@@ -400,6 +560,7 @@ apply_rollout() {
 mark_success() {
   write_status "succeeded"
   log "rollout succeeded: fresh required peer handshake observed"
+  close_old_firewall_port
 }
 
 verify_rollout() {
@@ -430,6 +591,7 @@ rollback_rollout() {
   load_metadata
   restore_previous_config
   restart_wireguard
+  revert_new_firewall_port
   write_status "rolled-back"
   log "rollback applied: restored ${CONFIG_PATH} and restarted wg-quick@${INTERFACE}.service"
 }
@@ -480,6 +642,10 @@ status_rollout() {
   log "timeout_seconds: ${TIMEOUT_SECONDS}"
   log "require_all_peers: ${REQUIRE_ALL_PEERS}"
   log "required_peers: $(join_peers_for_state)"
+  if [[ -n "${FIREWALL_ZONE}" ]]; then
+    log "firewall_zone: ${FIREWALL_ZONE}"
+    log "listen_port_change: ${FIREWALL_OLD_PORT} -> ${FIREWALL_NEW_PORT}"
+  fi
   if handshake_requirement_satisfied; then
     log "handshake_state: satisfied"
   elif deadline_reached; then
@@ -507,6 +673,7 @@ while [[ $# -gt 0 ]]; do
     --require-all-peers) REQUIRE_ALL_PEERS=1; shift ;;
     --wait-inline) WAIT_INLINE=1; shift ;;
     --no-schedule) SCHEDULE_ROLLBACK=0; shift ;;
+    --public-zone) require_option_value "$1" "${2:-}"; PUBLIC_ZONE="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) fail "unknown argument: $1" ;;
   esac
@@ -515,6 +682,9 @@ done
 validate_name "${INTERFACE}"
 validate_positive_int "timeout seconds" "${TIMEOUT_SECONDS}"
 validate_positive_int "poll seconds" "${POLL_SECONDS}"
+if [[ -n "${PUBLIC_ZONE}" ]]; then
+  validate_zone "${PUBLIC_ZONE}"
+fi
 for peer in "${REQUIRED_PEERS[@]}"; do
   validate_public_key "${peer}"
 done

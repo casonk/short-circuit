@@ -21,6 +21,28 @@
   names, profile-specific local filenames, DNS resolver provisioning, and
   firewalld zone assignment.
 
+### 2026-10-11 — A listen-port change is a rollout, not a one-off script
+
+- Changing a WireGuard listen port touches the server config, the live
+  listener, the WAN firewalld rule, every client `Endpoint`, and the router
+  forward. Do it through `guarded_wireguard_rollout.sh --public-zone`, not a
+  standalone migration script: a separate script duplicates the config helpers
+  and, worse, has no automatic rollback when the new port turns out to be
+  unreachable.
+- Order matters: forward both ports on the router, open the new host port,
+  switch the listener, confirm a fresh handshake on the new port, and only then
+  close the old host port and the old router forward. Closing the old port
+  first removes the path you would need to recover.
+- Never `firewall-cmd --reload` in the middle of a remote change. Apply the
+  permanent and runtime rule separately; a reload re-applies every zone and can
+  drop the session doing the work.
+- Check the prepared client `Endpoint` host against the current public address
+  or DNS name before blaming the port. A stale direct-IP endpoint makes a
+  correct cutover look broken.
+- Every concurrently active device needs its own key pair and tunnel IP. A
+  shared client identity makes the server endpoint flap between NAT mappings,
+  and no keepalive or MTU change fixes that.
+
 ### 2026-09-02 — Do not default WireGuard interfaces to firewalld trusted
 
 - The `trusted` zone has an ACCEPT target and bypasses service allowlists.
