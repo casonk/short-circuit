@@ -192,6 +192,48 @@ prior timer cannot block a corrected rollout. If a config was applied but guard
 scheduling failed, run `--arm-guard` to schedule verification from the saved
 pending metadata.
 
+## Fixed-Port Scan Resistance
+
+To migrate from WireGuard's default UDP port to the fixed non-default port
+`41194`, first prepare updated ignored configs and device imports:
+
+```bash
+bash scripts/migrate_wireguard_port.sh --prepare
+```
+
+If the current public address differs from the saved client Endpoint, pass it
+explicitly:
+
+```bash
+bash scripts/migrate_wireguard_port.sh --prepare \
+  --endpoint-host <current-public-ip-or-hostname>
+```
+
+Temporarily forward both the old and new UDP ports on the router, then switch
+the host:
+
+```bash
+sudo bash scripts/migrate_wireguard_port.sh --apply
+```
+
+Import a prepared client profile from
+`artifacts/wireguard-port-migration/` or scan its generated QR PNG, reconnect,
+and verify:
+
+```bash
+sudo bash scripts/migrate_wireguard_port.sh --verify
+```
+
+Remove the old router forward only after the new client handshake succeeds.
+Use `--rollback` to restore the saved host and local config state. A non-default
+port reduces opportunistic default-port scans but is not DoS protection.
+
+Repos that maintain additional ignored peer profiles can use the same prepare
+mode with `--config-dir` and `--export-dir`. Preparation recognizes
+`*peer*.local.conf` clients and `wg0-server*.local.conf` servers while keeping
+an ignored backup beside each config set.
+
+
 ### Export a Desktop Client Config
 
 For a MacBook or other desktop client, export the validated client config to a

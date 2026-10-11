@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Reversible fixed-port WireGuard migration workflow with staged client exports,
+  live verification, and rollback.
 - WireGuard edge preflight supports `--lan-interface` so NordVPN/default-route changes do not hide the physical router-forward target.
 - `scripts/check_wireguard_edge.sh`: read-only preflight for detecting stale router-forward targets before remote WireGuard work.
 - `--arm-guard` can recreate the timestamped rollback timer for an already-applied pending WireGuard rollout.

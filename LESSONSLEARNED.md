@@ -11,6 +11,14 @@
 
 ## Lessons
 
+- Every simultaneously active WireGuard device needs its own private/public key
+  pair and unique tunnel IP. Reusing one client identity across devices makes
+  the server endpoint flap between their NAT mappings ("last packet wins"),
+  causing intermittent disconnects that keepalive or MTU changes cannot fix.
+- When splitting a shared identity, retain one device on the existing peer,
+  generate new keys for the others, add distinct server peer entries, and
+  require importing the new profiles; changing only client IP addresses leaves
+  the key collision intact.
 - Document the repository around its real execution, curation, or integration flow instead of only the top-level folder list.
 - Keep local-only, private, reference-only, or generated boundaries explicit so published or runtime behavior is not confused with offline material or non-committable inputs.
 - Re-run repo-appropriate validation after changing generated artifacts, diagrams, workflows, or other CI-facing files so formatting and compatibility issues are caught before push.
@@ -43,6 +51,20 @@
 - If the installer manages firewalld at all, it should manage both pieces:
   public ingress on the listen port and the interface-to-zone mapping for
   post-handshake traffic.
+
+### 2026-06-25 — Fixed-port scan resistance needs a dual-forward migration
+
+- Changing a WireGuard listen port requires coordinated updates to the server
+  config, live listener, WAN firewalld rule, every client Endpoint, and the
+  router port-forward.
+- Prepare client profiles first, temporarily forward both old and new UDP
+  ports, switch the host, confirm a fresh handshake, and only then remove the
+  old router forward.
+- Preflight the prepared Endpoint host against the current public IP or stable
+  DNS name. Port migration can otherwise preserve a stale direct-IP endpoint
+  and make a correct router/firewall cutover look broken.
+- A non-default fixed port is defense-in-depth against opportunistic scans; it
+  does not replace firewall allowlisting or mitigate volumetric DoS.
 
 ### 2026-08-05 — A temporary Mac hub needs a distinct identity and activation path
 

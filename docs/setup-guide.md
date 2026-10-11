@@ -8,8 +8,8 @@ so that mobile or remote clients can reach private services on the host.
 - Linux host (Fedora, Debian, or Ubuntu) with internet access.
 - A supported package manager: `dnf`, `apt-get`, or `yum`.
 - Root access for installation steps.
-- UDP port 51820 accessible inbound on the host (router port-forward or firewall
-  rule).
+- The configured WireGuard UDP port accessible inbound on the host through the
+  router port-forward and firewall.
 - A stable public endpoint: either a hostname (`vpn.example.com`) or a known
   public IP. The installer can auto-fill the current public IP when none is set,
   but a stable DNS name is preferred.
