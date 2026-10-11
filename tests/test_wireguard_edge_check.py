@@ -18,7 +18,7 @@ def _write_configs(tmp_path: Path) -> tuple[Path, Path]:
             """
             [Interface]
             Address = 10.99.0.1/24
-            ListenPort = 41194
+            ListenPort = 51821
             """
         ).lstrip(),
         encoding="utf-8",
@@ -30,7 +30,7 @@ def _write_configs(tmp_path: Path) -> tuple[Path, Path]:
             Address = 10.99.0.3/32
 
             [Peer]
-            Endpoint = 68.41.12.47:41194
+            Endpoint = 203.0.113.47:51821
             AllowedIPs = 10.99.0.1/32
             """
         ).lstrip(),
@@ -55,7 +55,7 @@ def _env() -> dict[str, str]:
     env.update(
         {
             "SHORT_CIRCUIT_TEST_LAN_IPV4": "192.168.0.6",
-            "SHORT_CIRCUIT_TEST_PUBLIC_IPV4": "68.41.12.47",
+            "SHORT_CIRCUIT_TEST_PUBLIC_IPV4": "203.0.113.47",
         }
     )
     return env
@@ -71,7 +71,7 @@ def test_reports_required_router_forward_for_current_lan_ip(tmp_path: Path) -> N
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "current_host_lan_ipv4: 192.168.0.6" in result.stdout
-    assert "required_router_forward: UDP 41194 -> 192.168.0.6:41194" in result.stdout
+    assert "required_router_forward: UDP 51821 -> 192.168.0.6:51821" in result.stdout
     assert "public_endpoint_state: matches current public IPv4" in result.stdout
 
 
@@ -113,4 +113,4 @@ def test_lan_interface_option_reports_selected_interface(tmp_path: Path) -> None
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "lan_interface: enp5s0" in result.stdout
-    assert "required_router_forward: UDP 41194 -> 192.168.0.6:41194" in result.stdout
+    assert "required_router_forward: UDP 51821 -> 192.168.0.6:51821" in result.stdout
