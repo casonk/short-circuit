@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `scripts/guarded_wireguard_rollout.sh --public-zone ZONE`: listen-port changes
+  now go through the rollback guard. The new UDP port is opened in the named
+  firewalld zone before the listener moves, the old port is removed only after a
+  required peer completes a fresh handshake, and a rollback removes the new port
+  again if the rollout added it. No firewalld reload is issued.
 - WireGuard edge preflight supports `--lan-interface` so NordVPN/default-route changes do not hide the physical router-forward target.
 - `scripts/check_wireguard_edge.sh`: read-only preflight for detecting stale router-forward targets before remote WireGuard work.
 - `--arm-guard` can recreate the timestamped rollback timer for an already-applied pending WireGuard rollout.

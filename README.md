@@ -192,6 +192,37 @@ prior timer cannot block a corrected rollout. If a config was applied but guard
 scheduling failed, run `--arm-guard` to schedule verification from the saved
 pending metadata.
 
+#### Changing the listen port
+
+Moving WireGuard to a different UDP port is the same guarded rollout with one
+extra option. Put the new `ListenPort` in the candidate config and name the
+WAN-facing firewalld zone:
+
+```bash
+sudo ./scripts/guarded_wireguard_rollout.sh \
+  --apply \
+  --candidate /path/to/wg0.candidate.conf \
+  --interface wg0 \
+  --config /etc/wireguard/wg0.conf \
+  --public-zone <wan-zone>
+```
+
+1. Forward **both** the old and the new UDP port on the router first. The
+   router is never managed by this script.
+2. `--apply` opens the new port in the zone (permanent and runtime, without a
+   firewalld reload), then switches the listener. The old port stays open.
+3. Update each client's `Endpoint` to the new port and reconnect one.
+4. When a required peer completes a fresh handshake, `--verify` (or the armed
+   guard) marks the rollout succeeded and only then removes the old port from
+   the zone.
+5. If no handshake arrives before the deadline, the previous config is
+   restored and the new port is removed again if this rollout added it.
+6. Remove the old router forward after the rollout has succeeded.
+
+Without `--public-zone` a port change still rolls out, but the host firewall
+is left untouched and a warning is printed. A non-default port only reduces
+opportunistic scanning; it is not access control or DoS protection.
+
 ### Export a Desktop Client Config
 
 For a MacBook or other desktop client, export the validated client config to a
