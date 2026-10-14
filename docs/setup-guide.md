@@ -88,7 +88,10 @@ The installer will:
    resolve the private hostname to the server tunnel IP.
 4. Open the WireGuard UDP listen port on the WAN-facing firewalld zone
    (default: `public`).
-5. Configure a `systemd` drop-in so `dnsmasq` waits for the WireGuard interface.
+5. Configure a `systemd` drop-in so starting `dnsmasq` also starts the
+   WireGuard interface. It does not order `dnsmasq` after it: `bind-dynamic`
+   binds the tunnel address once it appears, and `After=wg-quick@` would form
+   a boot ordering cycle through `nss-lookup.target`.
 6. Assign the WireGuard interface to the explicit-service `wireguard` firewalld
    zone (if `firewalld` is active).
 7. Enable and start `wg-quick@wg0`.

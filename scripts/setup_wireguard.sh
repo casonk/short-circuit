@@ -506,9 +506,12 @@ EOF
 
   dropin_dir="$(dirname "${WIREGUARD_DNS_DROPIN}")"
   install -d "${dropin_dir}"
+  # Wants= only, no After=: dnsmasq orders itself before nss-lookup.target
+  # and wg-quick@ after it, so After=wg-quick@ here closes a cycle that
+  # systemd breaks on every boot. bind-dynamic above lets dnsmasq start
+  # first and bind the tunnel address when the interface appears.
   cat > "${WIREGUARD_DNS_DROPIN}" <<EOF
 [Unit]
-After=wg-quick@${INTERFACE_NAME}.service
 Wants=wg-quick@${INTERFACE_NAME}.service
 EOF
   systemctl daemon-reload

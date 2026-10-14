@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `setup_wireguard.sh` no longer orders `dnsmasq` after `wg-quick@<if>`. The
+  drop-in keeps `Wants=` but drops `After=`: `dnsmasq` starts before
+  `nss-lookup.target` and `wg-quick@` starts after it, so the old ordering
+  formed a cycle that systemd broke on every boot by deleting the
+  `nss-lookup.target` start job. `bind-dynamic` already lets `dnsmasq` start
+  before the tunnel exists. Re-run the installer, or remove the `After=` line
+  from `/etc/systemd/system/dnsmasq.service.d/short-circuit-wireguard.conf`.
+
 ### Added
 
 - `scripts/guarded_wireguard_rollout.sh --public-zone ZONE`: listen-port changes
