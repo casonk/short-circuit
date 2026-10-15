@@ -10,6 +10,15 @@ Mark items `[x]` when complete and move them to Done.
 
 ## Pending
 
+- [ ] [manual:2026-10-15] **Ask GitHub Support to purge pre-rewrite commits** — this
+  repository's published history was rewritten (most recently on 2026-10-15,
+  to remove per-commit AI attribution trailers). GitHub keeps serving the old
+  commits to anyone with a hash, and through the read-only `refs/pull/*` refs
+  of earlier pull requests, until Support garbage-collects them. The request
+  is filed once for the whole portfolio from traction-control's backlog; mark
+  this done when an old hash returns 404 here. Never push an old clone's
+  history back.
+
 - [ ] [manual:2026-10-11] **Ask GitHub Support to purge pre-rewrite history** — `main`
   was rewritten on 2026-10-11 to remove a home public IPv4 address and a live WireGuard listen port from
   every commit. GitHub still serves the old commits to anyone who has a hash,

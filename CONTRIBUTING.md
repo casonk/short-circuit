@@ -27,3 +27,13 @@ Thank you for your interest in contributing.
 - Config templates: use `<placeholder>` syntax for values that must be
   replaced before use.
 - Documentation: plain Markdown, wrap at 80 characters where practical.
+
+## AI Contribution Disclosure
+
+Parts of this repository's code, documentation and commit history were drafted
+with AI coding assistants, including Claude Code, OpenAI Codex, GitHub Copilot
+and Continue. The maintainer directs that work, reviews and tests each change
+before it merges, and is responsible for the result.
+
+This section is the repository-wide disclosure. Individual commits, pull
+requests and files do not carry per-tool attribution lines.
