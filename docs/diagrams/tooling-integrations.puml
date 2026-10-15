@@ -11,7 +11,8 @@ rectangle "config/service-failure-notify\n0 detected tools" as source_config_ser
 rectangle "containers/nord-egress/Containerfile\n8 detected tools" as source_containers_nord_egress_containerfile #E0F2FE
 rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n22 detected tools" as source_containers_nord_egress_nord_egress_entrypoint_sh #E0F2FE
 rectangle "scripts/check_wireguard_edge.sh\n6 detected tools" as source_scripts_check_wireguard_edge_sh #E0F2FE
-rectangle "scripts/guarded_wireguard_rollout.sh\n11 detected tools" as source_scripts_guarded_wireguard_rollout_sh #E0F2FE
+rectangle "scripts/guarded_wireguard_rollout.sh\n14 detected tools" as source_scripts_guarded_wireguard_rollout_sh #E0F2FE
+rectangle "scripts/hub_activation_guard.sh\n0 detected tools" as source_scripts_hub_activation_guard_sh #E0F2FE
 rectangle "scripts/install_failure_notifier.sh\n4 detected tools" as source_scripts_install_failure_notifier_sh #E0F2FE
 rectangle "scripts/run_tachometer_profile.sh\n3 detected tools" as source_scripts_run_tachometer_profile_sh #E0F2FE
 rectangle "scripts/setup_macvlan.sh\n10 detected tools" as source_scripts_setup_macvlan_sh #E0F2FE
@@ -42,6 +43,7 @@ cloud "gpasswd" as tool_gpasswd #FEF3C7
 cloud "grep" as tool_grep #FEF3C7
 cloud "head" as tool_head #FEF3C7
 cloud "i" as tool_i #FEF3C7
+cloud "in_interface" as tool_in_interface #FEF3C7
 cloud "in_peer" as tool_in_peer #FEF3C7
 cloud "index" as tool_index #FEF3C7
 cloud "install" as tool_install #FEF3C7
@@ -123,10 +125,13 @@ source_scripts_check_wireguard_edge_sh --> tool_value
 source_scripts_guarded_wireguard_rollout_sh --> tool_cat
 source_scripts_guarded_wireguard_rollout_sh --> tool_chmod
 source_scripts_guarded_wireguard_rollout_sh --> tool_cp
+source_scripts_guarded_wireguard_rollout_sh --> tool_firewall_cmd
+source_scripts_guarded_wireguard_rollout_sh --> tool_in_interface
 source_scripts_guarded_wireguard_rollout_sh --> tool_in_peer
 source_scripts_guarded_wireguard_rollout_sh --> tool_install
 source_scripts_guarded_wireguard_rollout_sh --> tool_mv
 source_scripts_guarded_wireguard_rollout_sh --> tool_next
+source_scripts_guarded_wireguard_rollout_sh --> tool_print
 source_scripts_guarded_wireguard_rollout_sh --> tool_readlink
 source_scripts_guarded_wireguard_rollout_sh --> tool_sleep
 source_scripts_guarded_wireguard_rollout_sh --> tool_systemctl
@@ -182,7 +187,7 @@ source_tests_containers_nord_token_login_run_test_sh --> tool_sleep
 source_tests_containers_nord_token_login_run_test_sh --> tool_tr
 source_tests_test_nord_token_login_podman_sh --> tool_podman
 note as toolingGraphSummary
-Scanned 16 tooling entrypoints.
-Detected 61 third-party tools.
+Scanned 17 tooling entrypoints.
+Detected 62 third-party tools.
 end note
 @enduml

@@ -8,7 +8,8 @@ skinparam linetype ortho
 rectangle "config/service-failure-notify\n0 local shell edges\n0 external tools" as shell_config_service_failure_notify #DBEAFE
 rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n0 local shell edges\n22 external tools" as shell_containers_nord_egress_nord_egress_entrypoint_sh #DBEAFE
 rectangle "scripts/check_wireguard_edge.sh\n0 local shell edges\n6 external tools" as shell_scripts_check_wireguard_edge_sh #DBEAFE
-rectangle "scripts/guarded_wireguard_rollout.sh\n0 local shell edges\n11 external tools" as shell_scripts_guarded_wireguard_rollout_sh #DBEAFE
+rectangle "scripts/guarded_wireguard_rollout.sh\n0 local shell edges\n14 external tools" as shell_scripts_guarded_wireguard_rollout_sh #DBEAFE
+rectangle "scripts/hub_activation_guard.sh\n0 local shell edges\n0 external tools" as shell_scripts_hub_activation_guard_sh #DBEAFE
 rectangle "scripts/install_failure_notifier.sh\n0 local shell edges\n4 external tools" as shell_scripts_install_failure_notifier_sh #DBEAFE
 rectangle "scripts/run_tachometer_profile.sh\n0 local shell edges\n3 external tools" as shell_scripts_run_tachometer_profile_sh #DBEAFE
 rectangle "scripts/setup_macvlan.sh\n0 local shell edges\n10 external tools" as shell_scripts_setup_macvlan_sh #DBEAFE
@@ -32,6 +33,7 @@ cloud "first_address" as tool_first_address #FEF3C7
 cloud "grep" as tool_grep #FEF3C7
 cloud "head" as tool_head #FEF3C7
 cloud "i" as tool_i #FEF3C7
+cloud "in_interface" as tool_in_interface #FEF3C7
 cloud "in_peer" as tool_in_peer #FEF3C7
 cloud "index" as tool_index #FEF3C7
 cloud "install" as tool_install #FEF3C7
@@ -100,10 +102,13 @@ shell_scripts_check_wireguard_edge_sh --> tool_value
 shell_scripts_guarded_wireguard_rollout_sh --> tool_cat
 shell_scripts_guarded_wireguard_rollout_sh --> tool_chmod
 shell_scripts_guarded_wireguard_rollout_sh --> tool_cp
+shell_scripts_guarded_wireguard_rollout_sh --> tool_firewall_cmd
+shell_scripts_guarded_wireguard_rollout_sh --> tool_in_interface
 shell_scripts_guarded_wireguard_rollout_sh --> tool_in_peer
 shell_scripts_guarded_wireguard_rollout_sh --> tool_install
 shell_scripts_guarded_wireguard_rollout_sh --> tool_mv
 shell_scripts_guarded_wireguard_rollout_sh --> tool_next
+shell_scripts_guarded_wireguard_rollout_sh --> tool_print
 shell_scripts_guarded_wireguard_rollout_sh --> tool_readlink
 shell_scripts_guarded_wireguard_rollout_sh --> tool_sleep
 shell_scripts_guarded_wireguard_rollout_sh --> tool_systemctl
@@ -152,8 +157,8 @@ shell_tests_containers_nord_token_login_run_test_sh --> tool_sleep
 shell_tests_containers_nord_token_login_run_test_sh --> tool_tr
 shell_tests_test_nord_token_login_podman_sh --> tool_podman
 note as shellGraphSummary
-Scanned 11 shell scripts.
+Scanned 12 shell scripts.
 Detected 0 local shell edges.
-Detected 53 external tools.
+Detected 54 external tools.
 end note
 @enduml

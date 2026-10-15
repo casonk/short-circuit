@@ -3,8 +3,10 @@ set namespaceSeparator none
 top to bottom direction
 skinparam componentStyle rectangle
 rectangle "conftest\n1 python file" as conftest
+rectangle "scripts.check_active_lease\n1 python file" as scripts.check_active_lease
 rectangle "scripts.render_nord_egress_container\n1 python file" as scripts.render_nord_egress_container
 rectangle "scripts.render_roaming_policy\n1 python file" as scripts.render_roaming_policy
 rectangle "scripts.render_wireguard_access_bundle\n1 python file" as scripts.render_wireguard_access_bundle
 rectangle "scripts.render_wireguard_mesh\n1 python file" as scripts.render_wireguard_mesh
+rectangle "scripts.update_mesh_ddns\n1 python file" as scripts.update_mesh_ddns
 @enduml

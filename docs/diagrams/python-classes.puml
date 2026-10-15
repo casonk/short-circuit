@@ -2,6 +2,10 @@
 set namespaceSeparator none
 class "<color:red>AccessBundleError</color>" as scripts.render_wireguard_access_bundle.AccessBundleError {
 }
+class "<color:red>DdnsError</color>" as scripts.update_mesh_ddns.DdnsError {
+}
+class "<color:red>LeaseError</color>" as scripts.check_active_lease.LeaseError {
+}
 class "<color:red>MeshError</color>" as scripts.render_wireguard_mesh.MeshError {
 }
 class "<color:red>NordEgressError</color>" as scripts.render_nord_egress_container.NordEgressError {
