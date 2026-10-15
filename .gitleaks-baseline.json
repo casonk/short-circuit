@@ -10,7 +10,7 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "scripts/install_failure_notifier.sh",
   "SymlinkFile": "",
-  "Commit": "1c4d156092238d79cd6fbd44b8c152d4f1b86f3d",
+  "Commit": "66ab0218c27053e72c4c2dc561c3b4d0a46baed2",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
@@ -20,7 +20,7 @@
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "1c4d156092238d79cd6fbd44b8c152d4f1b86f3d:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:23"
+  "Fingerprint": "66ab0218c27053e72c4c2dc561c3b4d0a46baed2:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:23"
  },
  {
   "RuleID": "portfolio-git-workspace-path",
@@ -33,7 +33,7 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "config/service-failure-notify",
   "SymlinkFile": "",
-  "Commit": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc",
+  "Commit": "199fcfaaf3acb6b0fd9c35a755235a6b1519f83e",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
@@ -43,7 +43,7 @@
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc:config/service-failure-notify:portfolio-git-workspace-path:7"
+  "Fingerprint": "199fcfaaf3acb6b0fd9c35a755235a6b1519f83e:config/service-failure-notify:portfolio-git-workspace-path:7"
  },
  {
   "RuleID": "portfolio-git-workspace-path",
@@ -56,7 +56,7 @@
   "Secret": "/mnt/4tb-m2/git/",
   "File": "scripts/install_failure_notifier.sh",
   "SymlinkFile": "",
-  "Commit": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc",
+  "Commit": "199fcfaaf3acb6b0fd9c35a755235a6b1519f83e",
   "Entropy": 3.0778196,
   "Author": "Cason Konzer",
   "Email": "72440835+casonk@users.noreply.github.com",
@@ -66,6 +66,6 @@
    "local-path",
    "machine-specific"
   ],
-  "Fingerprint": "95f9130b7b3dfaa73e36da197a9b737e5984e6dc:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:26"
+  "Fingerprint": "199fcfaaf3acb6b0fd9c35a755235a6b1519f83e:scripts/install_failure_notifier.sh:portfolio-git-workspace-path:26"
  }
 ]
