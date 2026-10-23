@@ -1,19 +1,19 @@
 @startuml
-title short-circuit Shell Script Flow
+title checkout Shell Script Flow
 left to right direction
 skinparam shadowing false
 skinparam defaultFontName Monospace
 skinparam componentStyle rectangle
 skinparam linetype ortho
 rectangle "config/service-failure-notify\n0 local shell edges\n0 external tools" as shell_config_service_failure_notify #DBEAFE
-rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n0 local shell edges\n22 external tools" as shell_containers_nord_egress_nord_egress_entrypoint_sh #DBEAFE
+rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n0 local shell edges\n23 external tools" as shell_containers_nord_egress_nord_egress_entrypoint_sh #DBEAFE
 rectangle "scripts/check_wireguard_edge.sh\n0 local shell edges\n6 external tools" as shell_scripts_check_wireguard_edge_sh #DBEAFE
 rectangle "scripts/guarded_wireguard_rollout.sh\n0 local shell edges\n14 external tools" as shell_scripts_guarded_wireguard_rollout_sh #DBEAFE
 rectangle "scripts/hub_activation_guard.sh\n0 local shell edges\n0 external tools" as shell_scripts_hub_activation_guard_sh #DBEAFE
 rectangle "scripts/install_failure_notifier.sh\n0 local shell edges\n4 external tools" as shell_scripts_install_failure_notifier_sh #DBEAFE
-rectangle "scripts/run_tachometer_profile.sh\n0 local shell edges\n3 external tools" as shell_scripts_run_tachometer_profile_sh #DBEAFE
-rectangle "scripts/setup_macvlan.sh\n0 local shell edges\n10 external tools" as shell_scripts_setup_macvlan_sh #DBEAFE
-rectangle "scripts/setup_wireguard.sh\n0 local shell edges\n16 external tools" as shell_scripts_setup_wireguard_sh #DBEAFE
+rectangle "scripts/run_tachometer_profile.sh\n0 local shell edges\n1 external tool" as shell_scripts_run_tachometer_profile_sh #DBEAFE
+rectangle "scripts/setup_macvlan.sh\n0 local shell edges\n7 external tools" as shell_scripts_setup_macvlan_sh #DBEAFE
+rectangle "scripts/setup_wireguard.sh\n0 local shell edges\n15 external tools" as shell_scripts_setup_wireguard_sh #DBEAFE
 rectangle "tests/containers/nord-token-login/probe-real-cli.sh\n0 local shell edges\n3 external tools" as shell_tests_containers_nord_token_login_probe_real_cli_sh #DBEAFE
 rectangle "tests/containers/nord-token-login/run-test.sh\n0 local shell edges\n6 external tools" as shell_tests_containers_nord_token_login_run_test_sh #DBEAFE
 rectangle "tests/test_nord_token_login_podman.sh\n0 local shell edges\n1 external tool" as shell_tests_test_nord_token_login_podman_sh #DBEAFE
@@ -22,8 +22,6 @@ cloud "apt-get" as tool_apt_get #FEF3C7
 cloud "block_size" as tool_block_size #FEF3C7
 cloud "cat" as tool_cat #FEF3C7
 cloud "chmod" as tool_chmod #FEF3C7
-cloud "client-private-key" as tool_client_private_key #FEF3C7
-cloud "cloned-mac" as tool_cloned_mac #FEF3C7
 cloud "count" as tool_count #FEF3C7
 cloud "cp" as tool_cp #FEF3C7
 cloud "curl" as tool_curl #FEF3C7
@@ -52,21 +50,18 @@ cloud "print" as tool_print #FEF3C7
 cloud "qrencode" as tool_qrencode #FEF3C7
 cloud "readlink" as tool_readlink #FEF3C7
 cloud "rm" as tool_rm #FEF3C7
-cloud "run" as tool_run #FEF3C7
 cloud "sed" as tool_sed #FEF3C7
-cloud "server-public-key" as tool_server_public_key #FEF3C7
 cloud "sleep" as tool_sleep #FEF3C7
 cloud "source_address" as tool_source_address #FEF3C7
 cloud "source_count" as tool_source_count #FEF3C7
 cloud "source_index" as tool_source_index #FEF3C7
 cloud "sources" as tool_sources #FEF3C7
 cloud "subnet_base" as tool_subnet_base #FEF3C7
-cloud "summarize" as tool_summarize #FEF3C7
 cloud "sysctl" as tool_sysctl #FEF3C7
 cloud "systemctl" as tool_systemctl #FEF3C7
 cloud "tachometer" as tool_tachometer #FEF3C7
+cloud "timeout" as tool_timeout #FEF3C7
 cloud "tr" as tool_tr #FEF3C7
-cloud "uuid" as tool_uuid #FEF3C7
 cloud "value" as tool_value #FEF3C7
 cloud "wg" as tool_wg #FEF3C7
 cloud "wireguard-public-vpn" as tool_wireguard_public_vpn #FEF3C7
@@ -91,6 +86,7 @@ shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_index
 shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sources
 shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_subnet_base
 shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sysctl
+shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_timeout
 shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_tr
 shell_containers_nord_egress_nord_egress_entrypoint_sh --> tool_value
 shell_scripts_check_wireguard_edge_sh --> tool_cat
@@ -117,29 +113,23 @@ shell_scripts_install_failure_notifier_sh --> tool_cat
 shell_scripts_install_failure_notifier_sh --> tool_chmod
 shell_scripts_install_failure_notifier_sh --> tool_install
 shell_scripts_install_failure_notifier_sh --> tool_systemctl
-shell_scripts_run_tachometer_profile_sh --> tool_run
-shell_scripts_run_tachometer_profile_sh --> tool_summarize
 shell_scripts_run_tachometer_profile_sh --> tool_tachometer
 shell_scripts_setup_macvlan_sh --> tool_cat
-shell_scripts_setup_macvlan_sh --> tool_cloned_mac
 shell_scripts_setup_macvlan_sh --> tool_cp
 shell_scripts_setup_macvlan_sh --> tool_grep
 shell_scripts_setup_macvlan_sh --> tool_head
 shell_scripts_setup_macvlan_sh --> tool_ip
 shell_scripts_setup_macvlan_sh --> tool_mv
 shell_scripts_setup_macvlan_sh --> tool_nmcli
-shell_scripts_setup_macvlan_sh --> tool_tr
-shell_scripts_setup_macvlan_sh --> tool_uuid
 shell_scripts_setup_wireguard_sh --> tool_apt_get
 shell_scripts_setup_wireguard_sh --> tool_cat
-shell_scripts_setup_wireguard_sh --> tool_client_private_key
 shell_scripts_setup_wireguard_sh --> tool_dnf
 shell_scripts_setup_wireguard_sh --> tool_firewall_cmd
 shell_scripts_setup_wireguard_sh --> tool_install
 shell_scripts_setup_wireguard_sh --> tool_print
 shell_scripts_setup_wireguard_sh --> tool_qrencode
 shell_scripts_setup_wireguard_sh --> tool_rm
-shell_scripts_setup_wireguard_sh --> tool_server_public_key
+shell_scripts_setup_wireguard_sh --> tool_sed
 shell_scripts_setup_wireguard_sh --> tool_sysctl
 shell_scripts_setup_wireguard_sh --> tool_systemctl
 shell_scripts_setup_wireguard_sh --> tool_value
@@ -159,6 +149,6 @@ shell_tests_test_nord_token_login_podman_sh --> tool_podman
 note as shellGraphSummary
 Scanned 12 shell scripts.
 Detected 0 local shell edges.
-Detected 54 external tools.
+Detected 49 external tools.
 end note
 @enduml

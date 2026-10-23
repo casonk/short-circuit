@@ -1,4 +1,4 @@
-@startuml classes_short-circuit
+@startuml classes_checkout
 set namespaceSeparator none
 class "<color:red>AccessBundleError</color>" as scripts.render_wireguard_access_bundle.AccessBundleError {
 }

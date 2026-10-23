@@ -1,5 +1,5 @@
 @startuml
-title short-circuit Tooling Integrations
+title checkout Tooling Integrations
 left to right direction
 skinparam shadowing false
 skinparam defaultFontName Monospace
@@ -9,14 +9,14 @@ rectangle ".github/workflows/ci.yml\n1 detected tool" as source_github_workflows
 rectangle ".github/workflows/secret-scan.yml\n1 detected tool" as source_github_workflows_secret_scan_yml #E0F2FE
 rectangle "config/service-failure-notify\n0 detected tools" as source_config_service_failure_notify #E0F2FE
 rectangle "containers/nord-egress/Containerfile\n8 detected tools" as source_containers_nord_egress_containerfile #E0F2FE
-rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n22 detected tools" as source_containers_nord_egress_nord_egress_entrypoint_sh #E0F2FE
+rectangle "containers/nord-egress/nord-egress-entrypoint.sh\n23 detected tools" as source_containers_nord_egress_nord_egress_entrypoint_sh #E0F2FE
 rectangle "scripts/check_wireguard_edge.sh\n6 detected tools" as source_scripts_check_wireguard_edge_sh #E0F2FE
-rectangle "scripts/guarded_wireguard_rollout.sh\n14 detected tools" as source_scripts_guarded_wireguard_rollout_sh #E0F2FE
+rectangle "scripts/guarded_wireguard_rollout.sh\n15 detected tools" as source_scripts_guarded_wireguard_rollout_sh #E0F2FE
 rectangle "scripts/hub_activation_guard.sh\n0 detected tools" as source_scripts_hub_activation_guard_sh #E0F2FE
 rectangle "scripts/install_failure_notifier.sh\n4 detected tools" as source_scripts_install_failure_notifier_sh #E0F2FE
-rectangle "scripts/run_tachometer_profile.sh\n3 detected tools" as source_scripts_run_tachometer_profile_sh #E0F2FE
-rectangle "scripts/setup_macvlan.sh\n10 detected tools" as source_scripts_setup_macvlan_sh #E0F2FE
-rectangle "scripts/setup_wireguard.sh\n16 detected tools" as source_scripts_setup_wireguard_sh #E0F2FE
+rectangle "scripts/run_tachometer_profile.sh\n1 detected tool" as source_scripts_run_tachometer_profile_sh #E0F2FE
+rectangle "scripts/setup_macvlan.sh\n7 detected tools" as source_scripts_setup_macvlan_sh #E0F2FE
+rectangle "scripts/setup_wireguard.sh\n15 detected tools" as source_scripts_setup_wireguard_sh #E0F2FE
 rectangle "tests/containers/nord-token-login/Containerfile\n6 detected tools" as source_tests_containers_nord_token_login_containerfile #E0F2FE
 rectangle "tests/containers/nord-token-login/Containerfile.real-prompt\n1 detected tool" as source_tests_containers_nord_token_login_containerfile_real_prompt #E0F2FE
 rectangle "tests/containers/nord-token-login/probe-real-cli.sh\n3 detected tools" as source_tests_containers_nord_token_login_probe_real_cli_sh #E0F2FE
@@ -24,14 +24,13 @@ rectangle "tests/containers/nord-token-login/run-test.sh\n6 detected tools" as s
 rectangle "tests/test_nord_token_login_podman.sh\n1 detected tool" as source_tests_test_nord_token_login_podman_sh #E0F2FE
 cloud "\\000" as tool_tool_000 #FEF3C7
 cloud "apt-get" as tool_apt_get #FEF3C7
+cloud "bash" as tool_bash #FEF3C7
 cloud "block_size" as tool_block_size #FEF3C7
 cloud "casonk/.github/.github/workflows/python-ci.yml" as tool_casonk_github_github_workflows_python_ci_yml #FEF3C7
 cloud "casonk/.github/.github/workflows/secret-scan.yml" as tool_casonk_github_github_workflows_secret_scan_yml #FEF3C7
 cloud "cat" as tool_cat #FEF3C7
 cloud "cc" as tool_cc #FEF3C7
 cloud "chmod" as tool_chmod #FEF3C7
-cloud "client-private-key" as tool_client_private_key #FEF3C7
-cloud "cloned-mac" as tool_cloned_mac #FEF3C7
 cloud "count" as tool_count #FEF3C7
 cloud "cp" as tool_cp #FEF3C7
 cloud "curl" as tool_curl #FEF3C7
@@ -62,9 +61,7 @@ cloud "print" as tool_print #FEF3C7
 cloud "qrencode" as tool_qrencode #FEF3C7
 cloud "readlink" as tool_readlink #FEF3C7
 cloud "rm" as tool_rm #FEF3C7
-cloud "run" as tool_run #FEF3C7
 cloud "sed" as tool_sed #FEF3C7
-cloud "server-public-key" as tool_server_public_key #FEF3C7
 cloud "sha256sum" as tool_sha256sum #FEF3C7
 cloud "sleep" as tool_sleep #FEF3C7
 cloud "source_address" as tool_source_address #FEF3C7
@@ -73,12 +70,11 @@ cloud "source_index" as tool_source_index #FEF3C7
 cloud "sources" as tool_sources #FEF3C7
 cloud "strip" as tool_strip #FEF3C7
 cloud "subnet_base" as tool_subnet_base #FEF3C7
-cloud "summarize" as tool_summarize #FEF3C7
 cloud "sysctl" as tool_sysctl #FEF3C7
 cloud "systemctl" as tool_systemctl #FEF3C7
 cloud "tachometer" as tool_tachometer #FEF3C7
+cloud "timeout" as tool_timeout #FEF3C7
 cloud "tr" as tool_tr #FEF3C7
-cloud "uuid" as tool_uuid #FEF3C7
 cloud "value" as tool_value #FEF3C7
 cloud "wg" as tool_wg #FEF3C7
 cloud "wget" as tool_wget #FEF3C7
@@ -114,6 +110,7 @@ source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_source_index
 source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sources
 source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_subnet_base
 source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_sysctl
+source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_timeout
 source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_tr
 source_containers_nord_egress_nord_egress_entrypoint_sh --> tool_value
 source_scripts_check_wireguard_edge_sh --> tool_cat
@@ -122,6 +119,7 @@ source_scripts_check_wireguard_edge_sh --> tool_i
 source_scripts_check_wireguard_edge_sh --> tool_ip
 source_scripts_check_wireguard_edge_sh --> tool_print
 source_scripts_check_wireguard_edge_sh --> tool_value
+source_scripts_guarded_wireguard_rollout_sh --> tool_bash
 source_scripts_guarded_wireguard_rollout_sh --> tool_cat
 source_scripts_guarded_wireguard_rollout_sh --> tool_chmod
 source_scripts_guarded_wireguard_rollout_sh --> tool_cp
@@ -140,29 +138,23 @@ source_scripts_install_failure_notifier_sh --> tool_cat
 source_scripts_install_failure_notifier_sh --> tool_chmod
 source_scripts_install_failure_notifier_sh --> tool_install
 source_scripts_install_failure_notifier_sh --> tool_systemctl
-source_scripts_run_tachometer_profile_sh --> tool_run
-source_scripts_run_tachometer_profile_sh --> tool_summarize
 source_scripts_run_tachometer_profile_sh --> tool_tachometer
 source_scripts_setup_macvlan_sh --> tool_cat
-source_scripts_setup_macvlan_sh --> tool_cloned_mac
 source_scripts_setup_macvlan_sh --> tool_cp
 source_scripts_setup_macvlan_sh --> tool_grep
 source_scripts_setup_macvlan_sh --> tool_head
 source_scripts_setup_macvlan_sh --> tool_ip
 source_scripts_setup_macvlan_sh --> tool_mv
 source_scripts_setup_macvlan_sh --> tool_nmcli
-source_scripts_setup_macvlan_sh --> tool_tr
-source_scripts_setup_macvlan_sh --> tool_uuid
 source_scripts_setup_wireguard_sh --> tool_apt_get
 source_scripts_setup_wireguard_sh --> tool_cat
-source_scripts_setup_wireguard_sh --> tool_client_private_key
 source_scripts_setup_wireguard_sh --> tool_dnf
 source_scripts_setup_wireguard_sh --> tool_firewall_cmd
 source_scripts_setup_wireguard_sh --> tool_install
 source_scripts_setup_wireguard_sh --> tool_print
 source_scripts_setup_wireguard_sh --> tool_qrencode
 source_scripts_setup_wireguard_sh --> tool_rm
-source_scripts_setup_wireguard_sh --> tool_server_public_key
+source_scripts_setup_wireguard_sh --> tool_sed
 source_scripts_setup_wireguard_sh --> tool_sysctl
 source_scripts_setup_wireguard_sh --> tool_systemctl
 source_scripts_setup_wireguard_sh --> tool_value
@@ -188,6 +180,6 @@ source_tests_containers_nord_token_login_run_test_sh --> tool_tr
 source_tests_test_nord_token_login_podman_sh --> tool_podman
 note as toolingGraphSummary
 Scanned 17 tooling entrypoints.
-Detected 62 third-party tools.
+Detected 58 third-party tools.
 end note
 @enduml
