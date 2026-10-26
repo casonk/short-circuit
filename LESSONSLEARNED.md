@@ -39,6 +39,9 @@
 - Check the prepared client `Endpoint` host against the current public address
   or DNS name before blaming the port. A stale direct-IP endpoint makes a
   correct cutover look broken.
+- When policy routing sends ordinary traffic through a VPN, bind public-IP
+  detection to the IPv4 interface in the main routing table; an unbound lookup
+  identifies the VPN exit, not the router-facing WAN address.
 - Every concurrently active device needs its own key pair and tunnel IP. A
   shared client identity makes the server endpoint flap between NAT mappings,
   and no keepalive or MTU change fixes that.

@@ -10,17 +10,6 @@ Mark items `[x]` when complete and move them to Done.
 
 ## Pending
 
-- [ ] [manual:2026-10-23] **Edge check compares the endpoint against the NordVPN exit** —
-  `scripts/check_wireguard_edge.sh` detects the public IPv4 with
-  `curl -4 -fsS https://ifconfig.me`. While NordLynx is connected, its policy
-  rule (`not fwmark 0xe1f1 lookup 205`) sends that request through the VPN, so
-  the check reports the Nord exit and can raise a false "endpoint host differs"
-  warning. Bind the lookup to the main-table default interface instead
-  (`curl --interface <dev>`, unprivileged via `SO_BINDTODEVICE` on Linux 5.7+;
-  `ip -j route show default` gives the device) and print which path was measured.
-  `setup_wireguard.sh` `detect_public_ip()` has the same exposure. Found from
-  locility's network tracing work.
-
 - [ ] [manual:2026-10-15] **Ask GitHub Support to purge pre-rewrite commits** — this
   repository's published history was rewritten (most recently on 2026-10-15,
   to remove per-commit AI attribution trailers). GitHub keeps serving the old
@@ -83,6 +72,12 @@ Mark items `[x]` when complete and move them to Done.
 ## In Progress
 
 ## Done
+
+- [x] [manual:2026-10-23] **Edge check compares the endpoint against the NordVPN exit** —
+  added shared interface-bound public IPv4 detection for the read-only edge
+  check and setup endpoint autofill. Both bind curl to the IPv4 main-table
+  default interface; the preflight reports which interface supplied the
+  comparison address.
 
 - [x] [manual:2026-08-27] Added the multi-service-peer access-bundle renderer.
   It binds the current client and one temporary peer to the active mesh, then

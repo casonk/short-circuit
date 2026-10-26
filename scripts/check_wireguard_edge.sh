@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${REPO_ROOT}/scripts/lib/public_ipv4.sh"
 INTERFACE="wg0"
 SERVER_CONFIG="${REPO_ROOT}/config/wireguard/wg0-server.public-vpn.local.conf"
 CLIENT_CONFIG="${REPO_ROOT}/config/wireguard/client-peer.public-vpn.local.conf"
@@ -106,15 +107,6 @@ detect_lan_ipv4() {
   '
 }
 
-detect_public_ipv4() {
-  if [[ -n "${SHORT_CIRCUIT_TEST_PUBLIC_IPV4:-}" ]]; then
-    printf '%s\n' "${SHORT_CIRCUIT_TEST_PUBLIC_IPV4}"
-    return
-  fi
-
-  curl -4 -fsS https://ifconfig.me
-}
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --interface) require_option_value "$1" "${2:-}"; INTERFACE="$2"; shift 2 ;;
@@ -157,7 +149,9 @@ if [[ "${endpoint_port}" != "${listen_port}" ]]; then
 fi
 
 if (( SKIP_PUBLIC_IP == 0 )); then
-  public_ipv4="$(detect_public_ipv4)"
+  public_interface="$(detect_main_table_default_interface)"
+  public_ipv4="$(detect_public_ipv4 "${public_interface}")"
+  printf 'public_ipv4_interface: %s (main-table default)\n' "${public_interface}"
   printf 'current_public_ipv4: %s\n' "${public_ipv4}"
   if [[ "${endpoint_host}" == "${public_ipv4}" ]]; then
     printf 'public_endpoint_state: matches current public IPv4\n'

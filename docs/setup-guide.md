@@ -142,6 +142,9 @@ router/DHCP changes:
 ```
 
 Use `--lan-interface` when NordVPN or another VPN can own the default route.
+The public IPv4 lookup is separately bound to the IPv4 default interface in
+the main route table and reports that interface, so a policy-routed VPN exit
+is not mistaken for the ISP address.
 If it reports an expected-target mismatch, fix the router forward before
 changing WireGuard. If it reports the correct target but cellular clients still
 do not handshake, capture packets on the WAN-facing interface while toggling a

@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Public IPv4 lookups in the edge preflight and installer now bind to the
+  IPv4 main-table default interface, avoiding false endpoint warnings and
+  VPN-exit autofill when a policy-routed VPN owns the default egress.
 - `setup_wireguard.sh` no longer orders `dnsmasq` after `wg-quick@<if>`. The
   drop-in keeps `Wants=` but drops `After=`: `dnsmasq` starts before
   `nss-lookup.target` and `wg-quick@` starts after it, so the old ordering

@@ -46,6 +46,8 @@ The two supported access profiles are:
   applicator
 - `scripts/check_wireguard_edge.sh`: read-only router-forwarding and edge
   preflight helper
+- `scripts/lib/public_ipv4.sh`: shared main-table interface-bound public IPv4
+  detection for the preflight and installer
 - `config/wireguard/wg0-server.example.conf`: server config template
 - `config/wireguard/wg0-server.lan-vpn.example.conf`: lan-vpn server template
 - `config/wireguard/client-peer.example.conf`: client peer template
