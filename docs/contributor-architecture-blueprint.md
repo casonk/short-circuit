@@ -84,7 +84,10 @@ Supports both profiles through a `--profile` flag.
 A read-only operator preflight for the public WireGuard edge. It compares the
 server `ListenPort`, client `Endpoint`, detected public IPv4, and current host
 LAN IPv4 from either the default route or an explicit LAN interface, then prints
-the router UDP forward that must exist. With
+the router UDP forward that must exist. Public IPv4 detection is shared with
+`scripts/setup_wireguard.sh` through `scripts/lib/public_ipv4.sh`; it binds
+curl to the IPv4 main-table default interface and reports which interface was
+measured, avoiding policy-routed VPN egress. With
 `--expected-router-target`, DHCP drift or a stale router rule fails before a
 remote-only maintenance window.
 

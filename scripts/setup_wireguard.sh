@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/public_ipv4.sh"
 
 SERVER_EXAMPLE="${REPO_ROOT}/config/wireguard/wg0-server.example.conf"
 SERVER_LAN_EXAMPLE="${REPO_ROOT}/config/wireguard/wg0-server.lan-vpn.example.conf"
@@ -352,33 +353,24 @@ format_endpoint_host() {
 }
 
 detect_public_ip() {
-  local url
+  local interface="$1"
   local ip_candidate
 
   require_command curl
+  ip_candidate="$(detect_public_ipv4 "${interface}" | tr -d '[:space:]')" ||
+    fail "unable to detect the current public IP automatically; set Endpoint manually in ${CLIENT_CONFIG}"
+  if [[ "${ip_candidate}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] ||
+    { [[ "${ip_candidate}" =~ ^[0-9A-Fa-f:]+$ ]] && [[ "${ip_candidate}" == *:* ]]; }; then
+    printf '%s\n' "${ip_candidate}"
+    return
+  fi
 
-  for url in \
-    "https://api.ipify.org" \
-    "https://ifconfig.me/ip" \
-    "https://icanhazip.com"
-  do
-    ip_candidate="$(curl -fsS --max-time 10 "${url}" 2>/dev/null | tr -d '[:space:]')" || continue
-    [[ -z "${ip_candidate}" ]] && continue
-    if [[ "${ip_candidate}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-      printf '%s\n' "${ip_candidate}"
-      return
-    fi
-    if [[ "${ip_candidate}" =~ ^[0-9A-Fa-f:]+$ ]] && [[ "${ip_candidate}" == *:* ]]; then
-      printf '%s\n' "${ip_candidate}"
-      return
-    fi
-  done
-
-  fail "unable to detect the current public IP automatically; set Endpoint manually in ${CLIENT_CONFIG}"
+  fail "unable to detect a valid public IP automatically; set Endpoint manually in ${CLIENT_CONFIG}"
 }
 
 autofill_client_endpoint_if_needed() {
   local public_ip
+  local public_interface
   local listen_port
   local endpoint
 
@@ -388,12 +380,15 @@ autofill_client_endpoint_if_needed() {
     return
   fi
 
-  public_ip="$(detect_public_ip)"
+  public_interface="$(detect_main_table_default_interface)" ||
+    fail "unable to determine the main-table default interface; set Endpoint manually in ${CLIENT_CONFIG}"
+  public_ip="$(detect_public_ip "${public_interface}")"
   listen_port="$(extract_first_config_value "${SERVER_CONFIG}" "ListenPort")"
   [[ -n "${listen_port}" ]] || listen_port="51820"
   endpoint="$(format_endpoint_host "${public_ip}"):${listen_port}"
 
   sed -i "s|^[[:space:]]*Endpoint[[:space:]]*=.*$|Endpoint = ${endpoint}|" "${CLIENT_CONFIG}"
+  warn "detected public IP via main-table interface ${public_interface}"
   warn "auto-set the client peer Endpoint to the current public IP (${public_ip}) in ${CLIENT_CONFIG}; replace it with a stable DNS name or other stable public endpoint if this WAN address can change"
 }
 

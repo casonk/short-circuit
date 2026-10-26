@@ -41,6 +41,8 @@ This repo lives under:
   peer reconnects
 - `scripts/check_wireguard_edge.sh`: read-only edge preflight that reports
   the required router UDP forward for the host's current LAN address
+- `scripts/lib/public_ipv4.sh`: shared direct-WAN interface selection and
+  interface-bound IPv4 lookup used by the edge check and installer
 - `scripts/render_wireguard_mesh.py`: fail-closed recovery-mesh renderer.
   Schema v2 (with schema-v1 in-memory compatibility) is the temporary,
   ≤31-day recovery mesh; schema v3 adds a **permanent** mesh (`expires_at`
@@ -165,7 +167,10 @@ router's UDP forward target:
 The script is read-only. It reports the server listen port, client endpoint,
 current host LAN IPv4, current public IPv4, and the required router rule. If the
 expected target differs from the current host LAN address, it exits nonzero so
-DHCP drift cannot stay silent.
+DHCP drift cannot stay silent. The public IPv4 lookup is bound to the
+IPv4 default interface in the main route table and reports that interface;
+this avoids comparing the endpoint against a policy-routed VPN exit. The
+installer uses the same interface-bound lookup when auto-filling an endpoint.
 
 ### Guarded Config Rollout
 
