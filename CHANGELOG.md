@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+- Add `scripts/prepare_listen_port_change.py`, the non-root prepare step for a
+  listen-port change: candidate server configs, client `Endpoint` rewrites with
+  backups, and QR re-export, all on git-ignored local files.
 - Add the `Private :: Do Not Upload` classifier so PyPI rejects an upload of this
   distribution; the repository is not published as a package.
 
