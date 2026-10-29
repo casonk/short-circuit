@@ -39,6 +39,9 @@ This repo lives under:
 - `scripts/guarded_wireguard_rollout.sh`: root-run config apply helper
   that snapshots the active config and rolls back automatically if no selected
   peer reconnects
+- `scripts/prepare_listen_port_change.py`: non-root helper that writes candidate
+  server configs, rewrites client `Endpoint` ports with backups, and re-exports
+  QR codes for a new listen port; it never touches the live host
 - `scripts/check_wireguard_edge.sh`: read-only edge preflight that reports
   the required router UDP forward for the host's current LAN address
 - `scripts/lib/public_ipv4.sh`: shared direct-WAN interface selection and

@@ -157,6 +157,41 @@ sudo timeout 30 tcpdump -ni enp5s0 udp port <client Endpoint port>
 Packets arriving means debug keys or live WireGuard state. No packets arriving
 means debug router forwarding, NAT, ISP, or upstream path first.
 
+## Prepare A Listen-Port Change
+
+Changing the server's UDP port touches the server config, every client
+profile's `Endpoint`, and the QR codes. `prepare_listen_port_change.py` does
+the file work without touching the live host (non-root):
+
+```bash
+python3 scripts/prepare_listen_port_change.py --new-port 51999 --dry-run   # report only
+python3 scripts/prepare_listen_port_change.py --new-port 51999
+```
+
+It reads the ignored `config/wireguard/wg0-server*.local.conf` and
+`client-peer*.local.conf` files and:
+
+- writes a candidate copy of each server config with the new `ListenPort`
+  under `artifacts/wireguard-port-migration/` (mode 0600);
+- rewrites the `Endpoint` port in each local client profile, keeping a
+  `<profile>.bak-<timestamp>` beside it, only on lines that use the current
+  port, so an endpoint for a different host is left alone;
+- re-exports each client's QR code as a PNG in the same directory when
+  `qrencode` is installed (it is never installed for you; `--no-qr` skips it).
+
+It refuses to run if any file it would touch is not git-ignored, if the server
+configs disagree on the current port, or if the new port equals the current
+one. Output lists file names and ports only, never keys. Then apply with the
+guard, opening the new port in the public zone:
+
+```bash
+sudo ./scripts/guarded_wireguard_rollout.sh --apply --public-zone <zone> \
+  --candidate artifacts/wireguard-port-migration/wg0-server.<profile>.local.conf
+```
+
+Forward the new port on the router before applying, and keep the old forward
+until a client has handshaken on the new one.
+
 ## Guard Remote Config Changes With Rollback
 
 When changing `/etc/wireguard/wg0.conf` from a remote session, stage the
