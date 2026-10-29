@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
+- Run the test suite from a private temp directory under the user cache when the
+  default temp directory is group- or world-writable. The mesh, roaming policy and
+  access-bundle renderers reject such an ancestor, so 18 tests failed locally
+  under `/tmp` while hosted CI passed.
+
 
 - Add `scripts/prepare_listen_port_change.py`, the non-root prepare step for a
   listen-port change: candidate server configs, client `Endpoint` rewrites with
