@@ -50,9 +50,6 @@ Mark items `[x]` when complete and move them to Done.
   default-deny ingress exposes only the reviewed WireGuard UDP port, keeps
   relay management on a separately protected path, and states the required
   Internet/outbound-UDP boundary explicitly.
-- [ ] [manual:2026-08-09] Publish the roaming plan's JSON/Markdown pair with an
-  atomic generation-directory commit and safe orphan-staging recovery. Current
-  rollback handles ordinary write failures but not a power loss between files.
 - [ ] [manual:2026-08-09] Regenerate and inspect both architecture PNG/SVG
   pairs when the shared PlantUML/draw.io render binaries are installed; the
   editable sources contain the roaming-policy change but exports are stale.
@@ -64,6 +61,8 @@ Mark items `[x]` when complete and move them to Done.
 ## In Progress
 
 ## Done
+
+- [x] [manual:2026-08-09] Publish the roaming plan's JSON/Markdown pair with an atomic generation-directory commit and safe orphan-staging recovery (2026-10-31): both files are staged privately and the directory is renamed into place; stale staging directories are removed conservatively on the next render.
 
 - [x] [manual:2026-10-23] **Edge check compares the endpoint against the NordVPN exit** —
   added shared interface-bound public IPv4 detection for the read-only edge

@@ -135,6 +135,16 @@ python3 scripts/render_roaming_policy.py render \
   --mesh-config config/wireguard/mesh.local.json
 ```
 
+The pair is published as one atomic generation directory. Both files are written
+into a private `.generation-N.staging-<random>` directory beside the output and
+that directory is renamed into place, so the generation directory either does not
+exist or holds the complete `roaming-plan.json` and `roaming-plan.md`, even if
+the machine loses power mid-render. The output directory must not already exist
+(an existing path, empty or not, is refused rather than written into). If a crash
+leaves a staging directory behind, the next render of that output removes it once
+it is an hour old, and only when it is a real owner-only directory holding at most
+the two plan files; anything that merely looks like it is left alone.
+
 Rendering is not deployment. `validate` reports both aggregate declared-path
 gaps and selected-primary gaps; an inert policy reports coverage as not
 evaluated. Application CRUD leadership remains governed by ACID leases/fencing;

@@ -15,8 +15,11 @@ import ipaddress
 import json
 import os
 import re
+import secrets
 import socket
+import stat
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -28,6 +31,11 @@ MESH_RENDERER_PATH = REPO_ROOT / "scripts" / "render_wireguard_mesh.py"
 DEFAULT_CONFIG = Path("config/wireguard/roaming-policy.local.json")
 DEFAULT_MESH_CONFIG = Path("config/wireguard/mesh.local.json")
 DEFAULT_OUTPUT_ROOT = Path("config/wireguard/mesh.local.d/roaming")
+PLAN_FILES = ("roaming-plan.json", "roaming-plan.md")
+# A staging directory left by a crash is removed only once it is this old, so a render that is still
+# running in another process is never disturbed.
+STALE_STAGING_SECONDS = 3600
+_STAGING_SUFFIX = re.compile(r"[0-9a-f]{16}")
 
 TOP_LEVEL_FIELDS = {
     "schema_version",
@@ -611,9 +619,83 @@ def _render_markdown(plan: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _staging_prefix(output: Path) -> str:
+    return f".{output.name}.staging-"
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _remove_staging(path: Path) -> bool:
+    """Remove one staging directory, but only if it holds nothing except the plan files.
+
+    Returns False (and leaves it) when it holds anything else, so a directory that only looks like
+    ours is never emptied.
+    """
+    try:
+        children = list(path.iterdir())
+        if any(c.name not in PLAN_FILES or c.is_symlink() or not c.is_file() for c in children):
+            return False
+        for child in children:
+            child.unlink()
+        path.rmdir()
+    except OSError:
+        return False
+    return True
+
+
+def recover_orphan_staging(
+    output: Path, *, max_age: float = STALE_STAGING_SECONDS, now: float | None = None
+) -> list[Path]:
+    """Remove the staging directories a crash left beside *output*.
+
+    A render writes both files into ``.<name>.staging-<random>`` and renames it into place, so an
+    interrupted render can only leave such a directory behind, never half a plan in the generation
+    directory. Only a real, owner-only directory of ours with the exact staging name, older than
+    ``max_age`` seconds and holding at most the two plan files, is removed.
+    """
+    parent, prefix = output.parent, _staging_prefix(output)
+    current = time.time() if now is None else now
+    removed: list[Path] = []
+    try:
+        entries = sorted(parent.iterdir())
+    except OSError:
+        return removed
+    for entry in entries:
+        tail = entry.name[len(prefix) :]
+        if not entry.name.startswith(prefix) or not _STAGING_SUFFIX.fullmatch(tail):
+            continue
+        try:
+            meta = entry.lstat()
+        except OSError:
+            continue
+        if (
+            stat.S_ISLNK(meta.st_mode)
+            or not stat.S_ISDIR(meta.st_mode)
+            or meta.st_uid != os.geteuid()
+            or meta.st_mode & 0o077
+            or current - meta.st_mtime < max_age
+        ):
+            continue
+        if _remove_staging(entry):
+            removed.append(entry)
+    return removed
+
+
 def render(
     *, document: dict[str, Any], mesh_document: dict[str, Any], output_dir: Path
 ) -> tuple[Path, Path]:
+    """Render the plan into ``output_dir`` as one atomic generation directory.
+
+    Both files are written into a private staging directory beside it and the directory is renamed
+    into place, so the generation directory either does not exist or holds the complete pair, even
+    if the machine loses power mid-render. ``output_dir`` must not exist yet.
+    """
     normalized = validate_document(document, mesh_document=mesh_document)
     if normalized["generation"] == 0:
         raise RoamingPolicyError("generation 0 is inert and cannot be rendered")
@@ -623,32 +705,39 @@ def render(
         raise RoamingPolicyError(f"WireGuard mesh validation failed: {error}") from error
     plan = _build_plan(normalized, mesh_normalized)
     output = Path(os.path.abspath(os.fspath(output_dir)))
-    json_path = output / "roaming-plan.json"
-    markdown_path = output / "roaming-plan.md"
+    json_name, markdown_name = PLAN_FILES
     try:
-        MESH._ensure_private_directory(output)
-        MESH._assert_target_available(json_path)
-        MESH._assert_target_available(markdown_path)
+        MESH._ensure_private_directory(output.parent)
+        MESH._assert_target_available(output)
     except MESH.MeshError as error:
         raise RoamingPolicyError(str(error)) from error
+    recover_orphan_staging(output)
 
     json_payload = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode("utf-8")
     markdown_payload = _render_markdown(plan).encode("utf-8")
-    json_created: Path | None = None
+    staging = output.parent / f"{_staging_prefix(output)}{secrets.token_hex(8)}"
+    committed = False
     try:
-        json_created = MESH._write_owner_only_new(json_path, json_payload)
-        markdown_created = MESH._write_owner_only_new(markdown_path, markdown_payload)
+        os.mkdir(staging, 0o700)
+        MESH._write_owner_only_new(staging / json_name, json_payload)
+        MESH._write_owner_only_new(staging / markdown_name, markdown_payload)
+        _fsync_directory(staging)
+        os.rename(staging, output)  # the commit: atomic, and fails if output appeared meanwhile
+        committed = True
+        _fsync_directory(output.parent)
     except (MESH.MeshError, OSError) as error:
-        if json_created is not None:
-            with contextlib.suppress(OSError):
-                json_created.unlink()
-        message = (
-            str(error)
-            if isinstance(error, MESH.MeshError)
-            else "could not write roaming plan"
-        )
+        if isinstance(error, MESH.MeshError):
+            message = str(error)
+        elif output.exists():
+            message = f"refusing to overwrite existing path: {output}"
+        else:
+            message = "could not write roaming plan"
         raise RoamingPolicyError(message) from error
-    return json_created, markdown_created
+    finally:
+        if not committed:
+            with contextlib.suppress(OSError):
+                _remove_staging(staging)
+    return output / json_name, output / markdown_name
 
 
 def _load_for_command(

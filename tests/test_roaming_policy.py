@@ -10,6 +10,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -611,6 +612,163 @@ class RoamingPolicyTest(unittest.TestCase):
             )
         self.assertFalse((output / "roaming-plan.json").exists())
         self.assertEqual(existing.read_text(encoding="utf-8"), "operator-owned\n")
+
+    # -- atomic generation-directory commit and orphan-staging recovery ------------
+
+    def render_into(self, output: Path):
+        return policy.render(
+            document=required_document(), mesh_document=active_mesh(), output_dir=output
+        )
+
+    def staging_dirs(self, parent: Path) -> list[Path]:
+        return sorted(parent.glob(".*.staging-*"))
+
+    def test_render_publishes_the_pair_by_renaming_a_complete_staging_directory(self) -> None:
+        output = self.root / "atomic"
+        seen: list[tuple[Path, Path, set[str], bool]] = []
+        real_rename = os.rename
+
+        def recording(source, target):
+            seen.append(
+                (Path(source), Path(target), {p.name for p in Path(source).iterdir()}, Path(target).exists())
+            )
+            return real_rename(source, target)
+
+        with mock.patch.object(policy.os, "rename", recording):
+            json_path, markdown_path = self.render_into(output)
+        self.assertEqual(len(seen), 1)
+        staged, target, names, existed = seen[0]
+        self.assertEqual(target, output)
+        self.assertEqual(names, {"roaming-plan.json", "roaming-plan.md"})  # complete before the commit
+        self.assertFalse(existed)  # the generation directory did not exist until the rename
+        self.assertEqual(staged.parent, output.parent)
+        self.assertEqual((json_path.parent, markdown_path.parent), (output, output))
+        self.assertEqual(self.staging_dirs(self.root), [])
+
+    def test_a_failure_between_the_two_files_leaves_nothing_and_a_retry_works(self) -> None:
+        output = self.root / "between"
+        real_write = policy.MESH._write_owner_only_new
+        calls = {"n": 0}
+
+        def second_fails(path, contents, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise policy.MESH.MeshError("simulated write failure")
+            return real_write(path, contents, **kwargs)
+
+        with mock.patch.object(policy.MESH, "_write_owner_only_new", second_fails):
+            with self.assertRaisesRegex(policy.RoamingPolicyError, "simulated write failure"):
+                self.render_into(output)
+        self.assertFalse(output.exists())  # no half pair is ever visible
+        self.assertEqual(self.staging_dirs(self.root), [])
+        json_path, markdown_path = self.render_into(output)  # nothing blocks the retry
+        self.assertTrue(json_path.is_file() and markdown_path.is_file())
+
+    def test_a_crash_before_the_commit_leaves_only_staging_and_the_next_render_recovers(self) -> None:
+        output = self.root / "crash"
+
+        class Crash(BaseException):
+            """Stands in for power loss: nothing after it runs."""
+
+        with (
+            mock.patch.object(policy.os, "rename", side_effect=Crash),
+            mock.patch.object(policy, "_remove_staging", return_value=False),  # no cleanup in a crash
+            self.assertRaises(Crash),
+        ):
+            self.render_into(output)
+        self.assertFalse(output.exists())
+        orphans = self.staging_dirs(self.root)
+        self.assertEqual(len(orphans), 1)
+        self.assertEqual({p.name for p in orphans[0].iterdir()}, {"roaming-plan.json", "roaming-plan.md"})
+        self.assertEqual(stat.S_IMODE(orphans[0].stat().st_mode), 0o700)
+
+        self.render_into(output)  # a retry is not blocked, and a fresh orphan is left alone
+        self.assertTrue((output / "roaming-plan.json").is_file())
+        self.assertEqual(self.staging_dirs(self.root), orphans)
+
+        old = time.time() - policy.STALE_STAGING_SECONDS - 60
+        os.utime(orphans[0], (old, old))
+        self.render_into(self.root / "crash-next")  # an old orphan of this output is removed
+        self.assertEqual(self.staging_dirs(self.root), orphans)  # different output name: untouched
+        policy.recover_orphan_staging(output)
+        self.assertEqual(self.staging_dirs(self.root), [])
+
+    def test_recovery_removes_only_genuine_old_staging_directories_of_its_own_output(self) -> None:
+        output = self.root / "generation-3"
+        prefix = f".{output.name}.staging-"
+        genuine = self.root / f"{prefix}{'a' * 16}"
+        genuine.mkdir(mode=0o700)
+        (genuine / "roaming-plan.json").write_text("{}", encoding="utf-8")
+        decoys = {
+            "bad suffix": self.root / f"{prefix}not-hex",
+            "other output": self.root / f".generation-4.staging-{'b' * 16}",
+            "plain file": self.root / f"{prefix}{'c' * 16}.txt",
+        }
+        decoys["bad suffix"].mkdir(mode=0o700)
+        decoys["other output"].mkdir(mode=0o700)
+        decoys["plain file"].write_text("x", encoding="utf-8")
+        link = self.root / f"{prefix}{'d' * 16}"
+        link.symlink_to(decoys["bad suffix"])
+        open_mode = self.root / f"{prefix}{'e' * 16}"
+        open_mode.mkdir(mode=0o755)
+        os.chmod(open_mode, 0o755)
+        extra = self.root / f"{prefix}{'f' * 16}"
+        extra.mkdir(mode=0o700)
+        (extra / "operator-notes.txt").write_text("keep", encoding="utf-8")
+        future = time.time() + 2 * policy.STALE_STAGING_SECONDS
+        removed = policy.recover_orphan_staging(output, now=future)
+        self.assertEqual(removed, [genuine])
+        self.assertFalse(genuine.exists())
+        for label, path in decoys.items():
+            self.assertTrue(path.exists(), label)
+        self.assertTrue(link.is_symlink() and open_mode.is_dir() and extra.is_dir())
+        self.assertEqual((extra / "operator-notes.txt").read_text(encoding="utf-8"), "keep")
+        self.assertEqual(policy.recover_orphan_staging(output, now=future), [])  # nothing left to do
+
+    def test_a_young_staging_directory_is_left_for_the_render_that_may_still_own_it(self) -> None:
+        output = self.root / "generation-5"
+        young = self.root / f".generation-5.staging-{'1' * 16}"
+        young.mkdir(mode=0o700)
+        self.assertEqual(policy.recover_orphan_staging(output), [])
+        self.assertTrue(young.is_dir())
+
+    def test_an_existing_generation_directory_is_never_replaced_or_staged_next_to(self) -> None:
+        empty = self.root / "empty-generation"
+        empty.mkdir(mode=0o700)
+        with self.assertRaisesRegex(policy.RoamingPolicyError, "refusing to overwrite"):
+            self.render_into(empty)
+        self.assertEqual(list(empty.iterdir()), [])
+        done = self.root / "done-generation"
+        self.render_into(done)
+        before = {p.name: p.read_bytes() for p in done.iterdir()}
+        with self.assertRaisesRegex(policy.RoamingPolicyError, "refusing to overwrite"):
+            self.render_into(done)
+        self.assertEqual({p.name: p.read_bytes() for p in done.iterdir()}, before)
+        self.assertEqual(self.staging_dirs(self.root), [])
+
+    def test_a_directory_created_while_staging_wins_and_is_not_touched(self) -> None:
+        output = self.root / "race"
+        real_rename = os.rename
+
+        def someone_else_first(source, target):
+            Path(target).mkdir(mode=0o700)
+            (Path(target) / "operator.txt").write_text("theirs", encoding="utf-8")
+            return real_rename(source, target)
+
+        with mock.patch.object(policy.os, "rename", someone_else_first):
+            with self.assertRaisesRegex(policy.RoamingPolicyError, "refusing to overwrite"):
+                self.render_into(output)
+        self.assertEqual((output / "operator.txt").read_text(encoding="utf-8"), "theirs")
+        self.assertFalse((output / "roaming-plan.json").exists())
+        self.assertEqual(self.staging_dirs(self.root), [])
+
+    def test_two_generations_stage_and_commit_independently(self) -> None:
+        first, second = self.root / "generation-1", self.root / "generation-2"
+        self.render_into(first)
+        self.render_into(second)
+        for output in (first, second):
+            self.assertEqual({p.name for p in output.iterdir()}, {"roaming-plan.json", "roaming-plan.md"})
+        self.assertEqual(self.staging_dirs(self.root), [])
 
     def test_init_validate_and_render_cli(self) -> None:
         inert_path = self.root / "inert.json"
