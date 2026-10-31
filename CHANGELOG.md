@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
+- Publish the roaming plan as one atomic generation directory. `render_roaming_policy.py render` now writes
+  `roaming-plan.json` and `roaming-plan.md` into a private staging directory beside the output and renames it
+  into place, so a power loss or error between the two files can no longer leave a lone file that blocks a
+  re-render; the output directory either does not exist or holds the complete pair. The output path must not
+  already exist (empty directories are refused too). A staging directory a crash leaves behind is removed by
+  the next render of that output once it is an hour old, and only when it is an owner-only directory holding
+  at most the two plan files.
 - Run the test suite from a private temp directory under the user cache when the
   default temp directory is group- or world-writable. The mesh, roaming policy and
   access-bundle renderers reject such an ancestor, so 18 tests failed locally
