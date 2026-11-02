@@ -52,3 +52,9 @@ CLAUDE.md
 .tachometer/
 
 /REFS-LOCAL.md
+
+# coverage output
+coverage.xml
+.coverage
+.coverage.*
+htmlcov/
