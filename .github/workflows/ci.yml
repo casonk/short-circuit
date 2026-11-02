@@ -10,3 +10,7 @@ jobs:
       python-versions: '["3.12"]'
       skip-install: false
       run-pytest: true
+      coverage: true
+      coverage-source: scripts
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
