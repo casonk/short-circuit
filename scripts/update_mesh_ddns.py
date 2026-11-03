@@ -37,6 +37,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any, Callable
 
 DEFAULT_CONFIG = Path("config/wireguard/ddns.local.json")
@@ -169,13 +170,28 @@ def validate_config(document: Any) -> dict[str, Any]:
     return normalized
 
 
+def _redacted_url(url: str) -> str:
+    """The URL without credentials, query or fragment, safe to show in an error.
+
+    A generic update URL commonly carries a secret token in its query string, and may carry
+    ``user:password@`` credentials, so neither may reach a log or a terminal.
+    """
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    try:
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:
+        port = ""
+    return f"{parts.scheme}://{host}{port}{parts.path}"
+
+
 def _default_http(method: str, url: str, headers: dict[str, str], body: bytes | None) -> Any:
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
             payload = response.read(MAX_CONFIG_BYTES + 1)
     except urllib.error.URLError as error:
-        raise DdnsError(f"{method} {url} failed: {error}") from error
+        raise DdnsError(f"{method} {_redacted_url(url)} failed: {error}") from error
     if not payload:
         return None
     try:
