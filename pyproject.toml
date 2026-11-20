@@ -7,7 +7,7 @@ name = "short-circuit"
 version = "0.1.0"
 description = "WireGuard VPN setup and configuration utility for private remote access."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
   { name = "Cason Konzer", email = "casonk@umich.edu" },
 ]
@@ -45,11 +45,11 @@ testpaths = ["tests"]
 
 [tool.black]
 line-length = 100
-target-version = ["py310"]
+target-version = ["py311"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
